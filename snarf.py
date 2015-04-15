@@ -129,7 +129,11 @@ class Text(object):
     
     #---------------------------------------------------------------------------
     def normalize(self):
-        self.text = re.sub(r" ([\w_-]+)='([^']*)'", r' \1="\2"', self.text)
+        self.text = re.sub(
+            r" ([\w_-]+)='([^']*)'", r' \1="\2"',
+            self.text,
+            flags=re.IGNORECASE
+        )
         return self
         
     #---------------------------------------------------------------------------
@@ -137,7 +141,7 @@ class Text(object):
         attrs = '|'.join(attrs or self.BAD_ATTRS)
         self.text = replace(
             self.text,
-            re.compile(' (' + attrs + ')="[^"]*"'),
+            re.compile(' (' + attrs + ')="[^"]*"', flags=re.IGNORECASE),
             ''
         )
         return self
@@ -155,7 +159,7 @@ class Text(object):
     #---------------------------------------------------------------------------
     def remove_tags(self, *tags):
         for tag in tags:
-            tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.I)
+            tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
             self.text = replace(self.text, tag_re, '')
         return self
 
