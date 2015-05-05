@@ -1,3 +1,4 @@
+# -*- coding:utf8 -*-
 import re
 import os
 import codecs
@@ -21,6 +22,19 @@ else:
         return r.text if as_text else r.content
 
 
+VERSION = (0, 1)
+
+#-------------------------------------------------------------------------------
+def get_version():
+    return '.'.join(map(str, VERSION))
+
+
+#-------------------------------------------------------------------------------
+def read_file(filename, encoding='utf8'):
+    with open(filename, 'r', encoding=encoding) as fp:
+        return fp.read()
+
+
 #-------------------------------------------------------------------------------
 def is_string(obj):
     '''
@@ -34,13 +48,11 @@ def replace(text, old, new, strip=False):
     '''
     Replace a subset of ``text``.
     
-    ``old`` type may be one of: string, a callable, or regular expression
+    ``old`` type may be either a string or regular expression
     
     '''
     if is_string(old):
         text = text.replace(old, new)
-    elif callable(new):
-        text = new(text)
     else:
         text = old.sub(new, text)
     
@@ -71,11 +83,6 @@ def remove_all(text, *items, **kws):
 
 
 #-------------------------------------------------------------------------------
-def get_lines(data):
-    return data.splitlines() if is_string(data) else data
-
-
-#-------------------------------------------------------------------------------
 def splitter(text, tok, expected=2, default=None, strip=False):
     bits = text.split(tok, expected - 1)
     if strip:
@@ -85,6 +92,7 @@ def splitter(text, tok, expected=2, default=None, strip=False):
     while n < expected:
         bits.append(default)
         n += 1
+    
     return bits
 
 
@@ -107,6 +115,9 @@ def matches(text, what):
 
 #===============================================================================
 class Text(object):
+    '''
+    Text handler class for manipulating a block text/HTML.
+    '''
 
     BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
 
@@ -129,6 +140,9 @@ class Text(object):
     
     #---------------------------------------------------------------------------
     def normalize(self):
+        '''
+        Convert all single quoted tag attributes to double quotes
+        '''
         self.text = re.sub(
             r" ([\w_-]+)='([^']*)'", r' \1="\2"',
             self.text,
@@ -166,7 +180,9 @@ class Text(object):
 
 #===============================================================================
 class Lines(object):
-    
+    '''
+    Convenience class for manipulating and traversing lines of text.
+    '''
     #---------------------------------------------------------------------------
     def __init__(self, text):
         self.lines = text.splitlines()
@@ -227,23 +243,4 @@ class Lines(object):
             self._update(end=found)
         
         return self
-    
-
-if __name__ == '__main__':
-    lines = Lines('''foo bar baz
-spam     
-xxxxxxxx
-zzzz
-   \t   123
-   u6ejtryn
-456''')
-    
-    #import ipdb; ipdb.set_trace()
-    func = re.compile('[123]').search
-    lines.compress().skip_to(func, False).read_until('456', False)
-    text = lines.text
-    print text, text == 'u6ejtryn'
-    
-    text = lines.end().text
-    print text, text == '456'
 
