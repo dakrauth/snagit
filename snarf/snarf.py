@@ -30,8 +30,25 @@ def get_version():
 
 
 #-------------------------------------------------------------------------------
+def absolute_filename(filename):
+    return os.path.abspath(
+        os.path.expandvars(
+            os.path.expanduser(filename)
+        )
+    )
+
+
+#-------------------------------------------------------------------------------
+def write_file(filename, data, mode='w', encoding='utf8'):
+    filename = absolute_filename(filename)
+    with codecs.open(filename, mode, encoding=encoding) as fp:
+        fp.write(data)
+
+
+#-------------------------------------------------------------------------------
 def read_file(filename, encoding='utf8'):
-    with open(filename, 'r', encoding=encoding) as fp:
+    filename = absolute_filename(filename)
+    with codecs.open(filename, 'r', encoding=encoding) as fp:
         return fp.read()
 
 
