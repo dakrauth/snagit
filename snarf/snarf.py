@@ -1,64 +1,10 @@
 # -*- coding:utf8 -*-
 import re
 import os
-import codecs
 from collections import deque
 
-try:
-    import requests
-except ImportError:
-    import warnings
-    warning.warn('Missing `requests` installation', ImportWarning)
-    
-    #---------------------------------------------------------------------------
-    def read_url(*args, **kws):
-        raise RuntimeError('Unavailable - check environment for proper 3rd party installs')
-    
-else:
-
-    #---------------------------------------------------------------------------
-    def read_url(url, as_text=True):
-        r = requests.get(url)
-        return r.text if as_text else r.content
-
-
-VERSION = (0, 1)
-
-#-------------------------------------------------------------------------------
-def get_version():
-    return '.'.join(map(str, VERSION))
-
-
-#-------------------------------------------------------------------------------
-def absolute_filename(filename):
-    return os.path.abspath(
-        os.path.expandvars(
-            os.path.expanduser(filename)
-        )
-    )
-
-
-#-------------------------------------------------------------------------------
-def write_file(filename, data, mode='w', encoding='utf8'):
-    filename = absolute_filename(filename)
-    with codecs.open(filename, mode, encoding=encoding) as fp:
-        fp.write(data)
-
-
-#-------------------------------------------------------------------------------
-def read_file(filename, encoding='utf8'):
-    filename = absolute_filename(filename)
-    with codecs.open(filename, 'r', encoding=encoding) as fp:
-        return fp.read()
-
-
-#-------------------------------------------------------------------------------
-def is_string(obj):
-    '''
-    Check if obj is a string
-    '''
-    return isinstance(obj, basestring)
-
+from . import utils
+is_string = utils.is_string
 
 #-------------------------------------------------------------------------------
 def replace(text, old, new, strip=False):
@@ -151,6 +97,12 @@ class Text(object):
     def __str__(self):
         return self.text
     
+    __unicode__ = __str__
+    
+    #---------------------------------------------------------------------------
+    def __len__(self):
+        return len(self.text)
+    
     #---------------------------------------------------------------------------
     def lines(self):
         return Lines(self.text)
@@ -188,7 +140,7 @@ class Text(object):
         return self
         
     #---------------------------------------------------------------------------
-    def remove_tags(self, *tags):
+    def remove_tags(self, tags):
         for tag in tags:
             tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
             self.text = replace(self.text, tag_re, '')
@@ -221,7 +173,13 @@ class Lines(object):
         
     #---------------------------------------------------------------------------
     def __str__(self):
-        return self.text
+        return '\n'.join(self.lines)
+
+    __unicode__ = __str__
+    
+    #---------------------------------------------------------------------------
+    def __len__(self):
+        return len(self.lines)
     
     #---------------------------------------------------------------------------
     def end(self):
@@ -231,7 +189,7 @@ class Lines(object):
     #---------------------------------------------------------------------------
     @property
     def text(self):
-        return '\n'.join(self.lines)
+        return Text(unicode(self))
     
     #---------------------------------------------------------------------------
     def compress(self):
