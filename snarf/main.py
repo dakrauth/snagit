@@ -8,20 +8,6 @@ from . import snarf, utils, script
 verbose = utils.verbose
 
 
-#===============================================================================
-class RangeAction(argparse.Action):
-    
-    #---------------------------------------------------------------------------
-    def __init__(self, option_strings, dest, nargs=None, **kwargs):
-        if nargs is not None:
-            raise ValueError("nargs not allowed")
-        super(RangeAction, self).__init__(option_strings, dest, **kwargs)
-    
-    #---------------------------------------------------------------------------
-    def __call__(self, parser, namespace, values, option_string=None):
-        setattr(namespace, self.dest, utils.parse_range(values))
-
-
 #-------------------------------------------------------------------------------
 def parse_args(args=None):
     parser = argparse.ArgumentParser(description='Capture, filter, and extract some text')
@@ -32,7 +18,7 @@ def parse_args(args=None):
         help='increase output verbosity')
     parser.add_argument('--pdb', action='store_true',
         help='use ipdb or pdb to debug')
-    parser.add_argument('-r', '--range', action=RangeAction,
+    parser.add_argument('-r', '--range',
         help='a range string to use for running sequences.')
     parser.add_argument('--range-token', dest='range_token', default=utils.DEFAULT_RANGE_TOKEN,
         help='token to be replaced in <source> strings when <range> is specified (default: @@@)')
@@ -40,6 +26,8 @@ def parse_args(args=None):
         help='script file to execute agains <source>')
     parser.add_argument('-o', '--output',
         help='output resultant content to specified file')
+    parser.add_argument('--repl', action='store_true',
+        help='Enter REPL script mode')
     
     return parser.parse_args(args)
 
@@ -57,14 +45,17 @@ def main(prog_args):
     if args.cache:
         loader.use_cache()
     
-    contents = None
-    for arg in args.source:
-        sources = loader.normalize(arg, args.range, args.range_token)
-        contents = loader.load(sources)
+    contents = loader.load(args.source, args.range, args.range_token)
     
-    if args.script:
-        contents = script.execute_script(args.script, contents)
-
+    if args.repl or args.script:
+        code = utils.read_file(args.script) if args.script else ''
+        scr = script.Script(code, contents, loader)
+        if code:
+            contents = scr.execute()
+    
+        if args.repl:
+            contents = scr.repl()
+    
     if args.output and contents:
         data = '\n'.join([unicode(c) for c in contents])
         verbose('Writing {} bytes', len(data))

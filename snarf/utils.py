@@ -124,12 +124,7 @@ class Loader(object):
     
     #---------------------------------------------------------------------------
     def use_cache(self, base_dir='~', snarf_dir='.snarf', cache_dir='cache'):
-        self.cache_dir = os.path.join(
-            absolute_filename(base_dir),
-            snarf_dir,
-            cache_dir
-        )
-        
+        self.cache_dir = os.path.join(absolute_filename(base_dir), snarf_dir, cache_dir)
         if not makedirs(self.cache_dir):
             verbose('Using cache directory {}', self.cache_dir)
         
@@ -141,7 +136,7 @@ class Loader(object):
         else:
             pth = 'index.html'
         
-        pth = '__'.join(os.path.split(pth))
+        pth = '__'.join([s for s in pth.split('/') if s])
         if not pth.endswith(('.html', '.htm')):
             pth += '.html'
         
@@ -149,12 +144,16 @@ class Loader(object):
         return dirname, os.path.join(dirname, pth)
         
     #---------------------------------------------------------------------------
-    def load(self, sources):
+    def load(self, sources, range=None, token=DEFAULT_RANGE_TOKEN):
         if is_string(sources):
             sources = [sources]
         
-        contents = []
+        normalized = []
         for src in sources:
+            normalized.extend(self.normalize(src, range, token))
+        
+        contents = []
+        for src in normalized:
             verbose('Loading {}', src)
             urlp = urlparse(src)
             data = None
@@ -177,7 +176,7 @@ class Loader(object):
                     if not os.path.exists(dirname):
                         os.makedirs(dirname)
                 
-                    snarf.write_file(src_munge, u'<!-- From: {} -->\n{}'.format(src, data))
+                    write_file(src_munge, u'<!-- From: {} -->\n{}'.format(src, data))
                 
             verbose('Loaded {} bytes', len(data))
             contents.append(data)
@@ -185,13 +184,9 @@ class Loader(object):
         return contents
 
     #---------------------------------------------------------------------------
-    def normalize(self, source, range_=None, range_token=DEFAULT_RANGE_TOKEN):
-        sources = []
-        if range_:
-            for r in range_:
-                sources.append(source.replace(range_token, r))
-        else:
-            sources.append(source)
-
-        return sources
+    def normalize(self, source, range=None, token=DEFAULT_RANGE_TOKEN):
+        if range:
+            return [source.replace(token, r) for r in parse_range(range)]
+        
+        return [source]
 

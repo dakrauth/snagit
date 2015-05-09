@@ -121,6 +121,9 @@ class Text(object):
         
     #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
+        if utils.is_string(attrs):
+            attrs = attrs.split(',')
+        
         attrs = '|'.join(attrs or self.BAD_ATTRS)
         self.text = replace(
             self.text,
@@ -130,17 +133,20 @@ class Text(object):
         return self
     
     #---------------------------------------------------------------------------
-    def remove_all(self, *what, **kws):
+    def remove_all(self, what, **kws):
         self.text = remove_all(self.text, *what, **kws)
         return self
 
     #---------------------------------------------------------------------------
-    def replace_all(self, *items, **kws):
+    def replace_all(self, items, **kws):
         self.text = replace_all(self.text, *items, **kws)
         return self
         
     #---------------------------------------------------------------------------
     def remove_tags(self, tags):
+        if utils.is_string(tags):
+            tags = tags.split(',')
+
         for tag in tags:
             tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
             self.text = replace(self.text, tag_re, '')
@@ -219,3 +225,10 @@ class Lines(object):
         
         return self
 
+    #---------------------------------------------------------------------------
+    def matches(self, what, push=True):
+        if push:
+            self.stack.append(self.lines)
+        
+        self.lines = [l for l in self.lines if matches(l, what)]
+        return self
