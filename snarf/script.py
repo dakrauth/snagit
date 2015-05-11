@@ -181,6 +181,7 @@ class Script(object):
         
     #---------------------------------------------------------------------------
     def _exec(self, instr):
+        verbose('Executing {}', instr.cmd)
         method = self.get_command(instr.cmd)
         if method is None:
             raise ScriptError('Unknown script instr (line {}): {}'.format(
@@ -210,8 +211,6 @@ class Script(object):
                 exc.args += ('Line {}'.format(instr.lineno),)
                 raise
             
-        verbose('Executed {}', instr.cmd)
-        
     #---------------------------------------------------------------------------
     def execute(self, instructions=None):
         instructions = instructions or self.program.instructions
@@ -228,9 +227,9 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     def cmd_help(self, args, kws):
-        print 'Commands:'
-        print '\n'.join(['   ' + s[4:] for s in dir(self) if s.startswith('cmd_')])
-        print 
+        print 'Commands:\n{}\n'.format(
+            '\n'.join(['   ' + s[4:] for s in dir(self) if s.startswith('cmd_')])
+        )
     
     #---------------------------------------------------------------------------
     def cmd_cache(self, args, kws):
@@ -238,14 +237,13 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     def cmd_load(self, args, kws):
-        verbose('cmd_load: {}, {}', args, kws)
         contents = self.loader.load(args, **kws)
         self.set_contents(contents)
     
     #---------------------------------------------------------------------------
     def cmd_write(self, args, kws):
         data = '\n'.join([unicode(c) for c in self.contents])
-        utls.write_file(args, data)
+        utils.write_file(args[0], data)
         
     #---------------------------------------------------------------------------
     def cmd_break(self, args, kws):
@@ -320,7 +318,7 @@ class Script(object):
     #---------------------------------------------------------------------------
     @content_command
     def cmd_remove_attrs(self, text, args, kws):
-        return text.remove_attrs(*args, **kws)
+        return text.remove_attrs(args[0] if args else None, **kws)
     
     #---------------------------------------------------------------------------
     @content_command

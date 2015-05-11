@@ -31,15 +31,14 @@ def remove(text, what, strip=False):
 
 
 #-------------------------------------------------------------------------------
-def replace_all(text, *items):
+def replace_all(text, items):
     for a,b in items:
         text = replace(text, a, b)
     return text
 
 
 #-------------------------------------------------------------------------------
-def remove_all(text, *items, **kws):
-    strip = kws.get('strip', False)
+def remove_all(text, items, strip=False):
     for item in items:
         text = remove(text, item, strip=strip)
     return text
@@ -85,13 +84,8 @@ class Text(object):
     BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
 
     #---------------------------------------------------------------------------
-    def __init__(self, text, normalize=False, bad_attrs=False):
+    def __init__(self, text):
         self.text = text
-        if normalize:
-            self.normalize()
-        
-        if bad_attrs:
-            self.remove_attrs()
     
     #---------------------------------------------------------------------------
     def __str__(self):
@@ -134,12 +128,12 @@ class Text(object):
     
     #---------------------------------------------------------------------------
     def remove_all(self, what, **kws):
-        self.text = remove_all(self.text, *what, **kws)
+        self.text = remove_all(self.text, what, **kws)
         return self
 
     #---------------------------------------------------------------------------
     def replace_all(self, items, **kws):
-        self.text = replace_all(self.text, *items, **kws)
+        self.text = replace_all(self.text, items, **kws)
         return self
         
     #---------------------------------------------------------------------------
