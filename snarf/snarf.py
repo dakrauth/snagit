@@ -1,7 +1,13 @@
 # -*- coding:utf8 -*-
 import re
 import os
+import copy
 from collections import deque
+
+try:
+    import bs4
+except ImportError:
+    bs4 = None
 
 from . import utils
 is_string = utils.is_string
@@ -117,6 +123,21 @@ class Bits(object):
         self._data = data
     
     #---------------------------------------------------------------------------
+    @property
+    def text(self):
+        return Text(unicode(self))
+
+    #---------------------------------------------------------------------------
+    @property
+    def lines(self):
+        return Lines(unicode(self))
+
+    #---------------------------------------------------------------------------
+    @property
+    def html(self):
+        return HTML(unicode(self))
+    
+    #---------------------------------------------------------------------------
     def end(self):
         self._data = self._stack.pop()
         return self
@@ -128,15 +149,9 @@ class Text(Bits):
     Text handler class for manipulating a block text/HTML.
     '''
 
-    BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
-
     #---------------------------------------------------------------------------
     def __init__(self, text):
         super(Text, self).__init__(text)
-    
-    #---------------------------------------------------------------------------
-    def lines(self):
-        return Lines(self._data)
     
     #---------------------------------------------------------------------------
     def normalize(self):
@@ -147,23 +162,10 @@ class Text(Bits):
         return self
         
     #---------------------------------------------------------------------------
-    def remove_attrs(self, attrs=None):
-        if utils.is_string(attrs):
-            attrs = attrs.split(',')
-        
-        attrs = '|'.join(attrs or self.BAD_ATTRS)
-        self._update(replace(
-            self._data,
-            re.compile(' (' + attrs + ')="[^"]*"', flags=re.IGNORECASE),
-            ''
-        ))
-        return self
-    
-    #---------------------------------------------------------------------------
     def remove_all(self, what, **kws):
         self._update(remove_all(self._data, what, **kws))
         return self
-
+        
     #---------------------------------------------------------------------------
     def replace_all(self, items, **kws):
         self._update(replace_all(self._data, items, **kws))
@@ -173,13 +175,97 @@ class Text(Bits):
     def remove_tags(self, tags):
         if utils.is_string(tags):
             tags = tags.split(',')
-
+        
         data = self._data
         for tag in tags:
             tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
             data = replace(self._data, tag_re, '')
             
         self._update(data)
+        return self
+        
+    #---------------------------------------------------------------------------
+    def remove_attrs(self, attrs=None):
+        if utils.is_string(attrs):
+            attrs = attrs.split(',')
+        
+        attrs = '|'.join(attrs or HTML.BAD_ATTRS)
+        self._update(replace(
+            self._data,
+            re.compile(' (' + attrs + ')="[^"]*"', flags=re.IGNORECASE),
+            ''
+        ))
+        return self
+
+
+#===============================================================================
+class HTML(Bits):
+
+    BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
+    
+    #---------------------------------------------------------------------------
+    def __init__(self, text):
+        super(HTML, self).__init__(bs4.BeautifulSoup(text))
+
+    #---------------------------------------------------------------------------
+    def __unicode__(self):
+        return unicode(self._data)
+    
+    __str__ = __unicode__
+
+    #---------------------------------------------------------------------------
+    def get_copy(self):
+        return bs4.BeautifulSoup(unicode(self._data))
+    
+    #---------------------------------------------------------------------------
+    def _call_cmd(self, cmd, args):
+        if utils.is_string(args):
+            args = args.split(',')
+        
+        soup = self.get_copy()
+        for arg in args:
+            for el in soup.find_all(arg):
+                method = getattr(el, cmd)
+                method()
+                
+        self._update(soup)
+        return self
+
+    #---------------------------------------------------------------------------
+    def unwrap(self, tags):
+        return self._call_cmd('unwrap', tags)
+        
+    #---------------------------------------------------------------------------
+    def extract(self, tags):
+        return self._call_cmd('extract', tags)
+    
+    #---------------------------------------------------------------------------
+    def select(self, query):
+        results = self._data.select(query)
+        if results:
+            soup = bs4.BeautifulSoup()
+            for el in results:
+                soup.append(el)
+            
+            self._update(soup)
+
+        return self
+
+    #---------------------------------------------------------------------------
+    def remove_attrs(self, attrs=None):
+        if utils.is_string(attrs):
+            attrs = attrs if attrs == '*' else attrs.split(',')
+
+        attrs = attrs or HTML.BAD_ATTRS
+        soup = self.get_copy()
+        for el in soup.descendants:
+            if hasattr(el, 'attrs'):
+                if attrs == '*':
+                    el.attrs = {}
+                elif el.attrs:
+                    el.attrs = dict([(k, v) for k,v in el.attrs.items() if k not in attrs])
+        
+        self._update(soup)
         return self
 
 
@@ -200,14 +286,9 @@ class Lines(Bits):
 
     #---------------------------------------------------------------------------
     def __str__(self):
-        return '\n'.join(self._data)
+        return u'\n'.join(self._data)
 
     __unicode__ = __str__
-    
-    #---------------------------------------------------------------------------
-    @property
-    def text(self):
-        return Text(unicode(self))
     
     #---------------------------------------------------------------------------
     def compress(self):

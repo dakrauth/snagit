@@ -67,8 +67,8 @@ class Instruction(object):
         
         if text:
             raise SyntaxError('Syntax error: "{}" (line {})'.format(text, self.lineno))
-        
-        
+
+
 #===============================================================================
 class Program(object):
     
@@ -241,11 +241,6 @@ class Script(object):
         self.set_contents(contents)
     
     #---------------------------------------------------------------------------
-    def cmd_write(self, args, kws):
-        data = '\n'.join([unicode(c) for c in self.contents])
-        utils.write_file(args[0], data)
-        
-    #---------------------------------------------------------------------------
     def cmd_break(self, args, kws):
         self.do_break = True
     
@@ -269,8 +264,19 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     @content_command
+    def cmd_html(self, content, args, kws):
+        return snarf.HTML(unicode(content))
+    
+    #---------------------------------------------------------------------------
+    @content_command
     def cmd_lines(self, content, args, kws):
         return snarf.Lines(unicode(content))
+
+    #---------------------------------------------------------------------------
+    @content_command
+    def cmd_write(self, content, args, kws):
+        data = '\n'.join([unicode(c) for c in self.contents])
+        utils.write_file(args[0], data)
 
     #---------------------------------------------------------------------------
     # Lines methods
@@ -335,12 +341,27 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     @content_command
-    def cmd_remove_tags(self, text, args, kws):
+    def cmd_unwrap(self, text, args, kws):
         for tag in args:
-            text = text.remove_tags(tag, **kws)
-
+            text = text.unwrap(tag, **kws)
+        
         return text
 
+    #---------------------------------------------------------------------------
+    @content_command
+    def cmd_extract(self, text, args, kws):
+        for tag in args:
+            text = text.extract(tag, **kws)
+        
+        return text
+    
+    #---------------------------------------------------------------------------
+    @content_command
+    def cmd_select(self, text, args, kws):
+        for arg in args:
+            text = text.select(arg)
+        
+        return text
 
 #-------------------------------------------------------------------------------
 def execute_script(filename, contents):
