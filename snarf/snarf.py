@@ -6,6 +6,24 @@ from collections import deque
 from . import utils
 is_string = utils.is_string
 
+attr_pattern = r'''((?:\s+)([\w:-]+)=('[^']*'|"[^"]*"|[\w.:;&#-]+))'''
+attr_re = re.compile(attr_pattern)
+start_tag_re = re.compile(r'''<([\w:-]+)(%s+)>''' % (attr_pattern,))
+
+#-------------------------------------------------------------------------------
+def normalize_attrs(text):
+    def replacement(m):
+        tag = m.group(1)
+        attrs = []
+        for m2 in attr_re.finditer(m.group(2)):
+            value = m2.group(3)
+            if value.startswith(("'", '"')):
+                value = value[1:-1]
+            attrs.append(u' {}="{}"'.format(m2.group(2), value))
+        return u'<{}{}>'.format(tag, ''.join(attrs))
+    return start_tag_re.sub(replacement, text)
+
+
 #-------------------------------------------------------------------------------
 def replace(text, old, new, strip=False):
     '''
@@ -76,7 +94,36 @@ def matches(text, what):
 
 
 #===============================================================================
-class Text(object):
+class Bits(object):
+
+    #---------------------------------------------------------------------------
+    def __init__(self, data):
+        self._data = data
+        self._stack = []
+    
+    #---------------------------------------------------------------------------
+    def __str__(self):
+        return self._data
+    
+    __unicode__ = __str__
+    
+    #---------------------------------------------------------------------------
+    def __len__(self):
+        return len(self._data)
+    
+    #---------------------------------------------------------------------------
+    def _update(self, data):
+        self._stack.append(self._data)
+        self._data = data
+    
+    #---------------------------------------------------------------------------
+    def end(self):
+        self._data = self._stack.pop()
+        return self
+
+
+#===============================================================================
+class Text(Bits):
     '''
     Text handler class for manipulating a block text/HTML.
     '''
@@ -85,32 +132,18 @@ class Text(object):
 
     #---------------------------------------------------------------------------
     def __init__(self, text):
-        self.text = text
-    
-    #---------------------------------------------------------------------------
-    def __str__(self):
-        return self.text
-    
-    __unicode__ = __str__
-    
-    #---------------------------------------------------------------------------
-    def __len__(self):
-        return len(self.text)
+        super(Text, self).__init__(text)
     
     #---------------------------------------------------------------------------
     def lines(self):
-        return Lines(self.text)
+        return Lines(self._data)
     
     #---------------------------------------------------------------------------
     def normalize(self):
         '''
         Convert all single quoted tag attributes to double quotes
         '''
-        self.text = re.sub(
-            r" ([\w_-]+)='([^']*)'", r' \1="\2"',
-            self.text,
-            flags=re.IGNORECASE
-        )
+        self._update(normalize_attrs(self._data))
         return self
         
     #---------------------------------------------------------------------------
@@ -119,21 +152,21 @@ class Text(object):
             attrs = attrs.split(',')
         
         attrs = '|'.join(attrs or self.BAD_ATTRS)
-        self.text = replace(
-            self.text,
+        self._update(replace(
+            self._data,
             re.compile(' (' + attrs + ')="[^"]*"', flags=re.IGNORECASE),
             ''
-        )
+        ))
         return self
     
     #---------------------------------------------------------------------------
     def remove_all(self, what, **kws):
-        self.text = remove_all(self.text, what, **kws)
+        self._update(remove_all(self._data, what, **kws))
         return self
 
     #---------------------------------------------------------------------------
     def replace_all(self, items, **kws):
-        self.text = replace_all(self.text, items, **kws)
+        self._update(replace_all(self._data, items, **kws))
         return self
         
     #---------------------------------------------------------------------------
@@ -141,50 +174,35 @@ class Text(object):
         if utils.is_string(tags):
             tags = tags.split(',')
 
+        data = self._data
         for tag in tags:
             tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
-            self.text = replace(self.text, tag_re, '')
+            data = replace(self._data, tag_re, '')
+            
+        self._update(data)
         return self
 
 
 #===============================================================================
-class Lines(object):
+class Lines(Bits):
     '''
     Convenience class for manipulating and traversing lines of text.
     '''
     #---------------------------------------------------------------------------
     def __init__(self, text):
-        self.lines = text.splitlines()
-        self.stack = deque()
+        super(Lines, self).__init__(text.splitlines())
 
     #---------------------------------------------------------------------------
     def _find_first(self, what):
-        for i, line in enumerate(self.lines):
+        for i, line in enumerate(self._data):
             if matches(line, what):
                 return i
 
     #---------------------------------------------------------------------------
-    def _update(self, start=None, end=None):
-        if start == end == None:
-            return
-        
-        self.stack.append(self.lines[end:start])
-        self.lines = self.lines[start:end]
-        
-    #---------------------------------------------------------------------------
     def __str__(self):
-        return '\n'.join(self.lines)
+        return '\n'.join(self._data)
 
     __unicode__ = __str__
-    
-    #---------------------------------------------------------------------------
-    def __len__(self):
-        return len(self.lines)
-    
-    #---------------------------------------------------------------------------
-    def end(self):
-        self.lines = self.stack.pop()
-        return self
     
     #---------------------------------------------------------------------------
     @property
@@ -193,20 +211,19 @@ class Lines(object):
     
     #---------------------------------------------------------------------------
     def compress(self):
-        self.lines = [' '.join(l.strip().split()) for l in self.lines]
+        self._update([' '.join(l.strip().split()) for l in self._data])
         return self
     
     #---------------------------------------------------------------------------
     def strip(self):
-        self.lines = [l.strip() for l in self.lines]
+        self._update([l.strip() for l in self._data])
         return self
 
     #---------------------------------------------------------------------------
     def skip_to(self, what, keep=True):
         found = self._find_first(what)
         if found is not None:
-            found = found if keep else found + 1
-            self._update(start=found)
+            self._update(self._data[found:])
         
         return self
 
@@ -215,14 +232,11 @@ class Lines(object):
         found = self._find_first(what)
         if found is not None:
             found = found + 1 if keep else found
-            self._update(end=found)
+            self._update(self._data[:found])
         
         return self
 
     #---------------------------------------------------------------------------
-    def matches(self, what, push=True):
-        if push:
-            self.stack.append(self.lines)
-        
-        self.lines = [l for l in self.lines if matches(l, what)]
+    def matches(self, what):
+        self._update([l for l in self._data if matches(l, what)])
         return self

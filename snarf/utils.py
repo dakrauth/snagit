@@ -6,21 +6,8 @@ from urlparse import urlparse, ParseResult
 try:
     import requests
 except ImportError:
-    import warnings
     warning.warn('Missing `requests` installation', ImportWarning)
     
-    #---------------------------------------------------------------------------
-    def read_url(*args, **kws):
-        raise RuntimeError('Unavailable - check environment for proper 3rd party installs')
-    
-else:
-
-    #---------------------------------------------------------------------------
-    def read_url(url, as_text=True):
-        r = requests.get(url)
-        return r.text if as_text else r.content
-
-
 try:
     import ipdb as pdb
 except ImportError:
@@ -29,6 +16,13 @@ except ImportError:
 logger = logging.getLogger('snarf')
 
 DEFAULT_RANGE_TOKEN = '@@@'
+
+
+#---------------------------------------------------------------------------
+def read_url(url, as_text=True):
+    r = requests.get(url)
+    return r.text if as_text else r.content
+
 
 #-------------------------------------------------------------------------------
 def is_string(obj):
