@@ -10,6 +10,8 @@ except ImportError:
     bs4 = None
 
 from . import utils
+from . import markup
+
 is_string = utils.is_string
 
 attr_pattern = r'''((?:\s+)([\w:-]+)=('[^']*'|"[^"]*"|[\w.:;&#-]+))'''
@@ -209,7 +211,7 @@ class HTML(Bits):
 
     #---------------------------------------------------------------------------
     def __unicode__(self):
-        return unicode(self._data)
+        return markup.bs4format(self._data)
     
     __str__ = __unicode__
 
@@ -231,6 +233,7 @@ class HTML(Bits):
         self._update(soup)
         return self
 
+    
     #---------------------------------------------------------------------------
     def unwrap(self, tags):
         return self._call_cmd('unwrap', tags)

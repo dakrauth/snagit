@@ -136,6 +136,10 @@ class BS4Formatter(HTMLFormatter):
     @classmethod
     def format_element(cls, el, depth=0, prefix='    '):
         indent = prefix * depth
+        if isinstance(el, bs4.NavigableString):
+            el = el.strip()
+            return u'{}{}\n'.format(indent, el) if el else ''
+            
         tag = cls.get_tag(el)
         s = u'{}<{}'.format(indent, tag)
         
@@ -154,31 +158,32 @@ class BS4Formatter(HTMLFormatter):
                 s += '\n'
                 for child in children:
                     child_tag = cls.get_tag(child)
-                    if child_tag:
-                        s += cls.format_element(
-                            child,
-                            depth if child_tag in cls.NO_INDENT else depth + 1,
-                            prefix
-                        )
-                    else:
-                        child = child.strip()
-                        if child:
-                            s += u'{}{}\n'.format(indent + prefix, child)
-            
+                    s += cls.format_element(
+                        child,
+                        depth if child_tag in cls.NO_INDENT else depth + 1,
+                        prefix
+                    )
                 return s + u'{}</{}>\n'.format(indent, tag)
             else:
-                s += '{}'.format(children[0].strip())
+                s += u'{}'.format(children[0].strip())
         return s + u'</{}>\n'.format(tag)
 
     #---------------------------------------------------------------------------
     @classmethod
     def format(cls, el, depth=0, prefix='    ', doctype=True):
         st = ''
+        start = 0
         if isinstance(el, bs4.BeautifulSoup):
-            st = unicode(el.contents[0].output_ready())
-            el = el.contents[1]
-        #    st = el.getroottree().docinfo.doctype if doctype == True else doctype
-        #    st += '\n'
-        
-        #import ipdb; ipdb.set_trace()
-        return st + cls.format_element(el, depth, prefix)
+            first = el.contents[0]
+            if isinstance(first, bs4.Doctype):
+                st += unicode(first.output_ready())
+                start = 1
+
+        for child in el.contents[start:]:
+            st += cls.format_element(child, depth, prefix)
+
+        return st
+
+#-------------------------------------------------------------------------------
+def bs4format(*args, **kws):
+    return BS4Formatter.format(*args, **kws)

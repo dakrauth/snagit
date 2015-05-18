@@ -252,7 +252,6 @@ class Script(object):
     @content_command
     def cmd_dumps(self, content, args, kws):
         print unicode(content)
-        print
         return content
     
     #---------------------------------------------------------------------------
@@ -323,11 +322,6 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     @content_command
-    def cmd_remove_attrs(self, text, args, kws):
-        return text.remove_attrs(args[0] if args else None, **kws)
-    
-    #---------------------------------------------------------------------------
-    @content_command
     def cmd_remove(self, text, args, kws):
         return text.remove_all(args, **kws)
     
@@ -338,6 +332,15 @@ class Script(object):
         replacement = args.pop()
         args = [(a, replacement) for a in args]
         return text.replace_all(args, **kws)
+    
+    #---------------------------------------------------------------------------
+    # HTML methods
+    #---------------------------------------------------------------------------
+
+    #---------------------------------------------------------------------------
+    @content_command
+    def cmd_remove_attrs(self, text, args, kws):
+        return text.remove_attrs(args[0] if args else None, **kws)
     
     #---------------------------------------------------------------------------
     @content_command
