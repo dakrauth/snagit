@@ -18,7 +18,7 @@ def parse_args(args=None):
         help='increase output verbosity')
     parser.add_argument('--pdb', action='store_true',
         help='use ipdb or pdb to debug')
-    parser.add_argument('-r', '--range',
+    parser.add_argument('--range-set', dest='range_set',
         help='a range string to use for running sequences.')
     parser.add_argument('--range-token', dest='range_token', default=utils.DEFAULT_RANGE_TOKEN,
         help='token to be replaced in <source> strings when <range> is specified (default: @@@)')
@@ -45,7 +45,7 @@ def main(prog_args):
     if args.cache:
         loader.use_cache()
     
-    contents = loader.load(args.source, args.range, args.range_token)
+    contents = loader.load(args.source, args.range_set, args.range_token)
     
     if args.repl or args.script:
         code = utils.read_file(args.script) if args.script else ''

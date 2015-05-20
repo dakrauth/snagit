@@ -1,3 +1,4 @@
+import re
 import os
 import codecs
 import logging
@@ -84,29 +85,39 @@ def read_file(filename, encoding='utf8'):
         return fp.read()
 
 
-#-------------------------------------------------------------------------------
-def parse_range(s):
-    lst = list(s)
-    if len(lst) < 3:
-        return lst
 
-    seq = []
-    found = False
-    for c in lst:
-        if c == '-':
-            found = True
-        else:
-            if found:
-                i, j = ord(seq[-1]), ord(c)
-                inc = 1 if i <= j else -1
-                for k in range(i + inc, j + inc, inc):
-                    seq.append(chr(k))
-                found = False
-            else:
-                seq.append(c)
-    if found:
-        seq.append('-')
-    return seq
+range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
+
+#-------------------------------------------------------------------------------
+def get_range_run(start, end):
+    if start.isdigit():
+        fmt = '{}'
+        if len(start) > 1 and start[0] == '0':
+            fmt = '{{:0>{}}}'.format(len(start))
+        return [fmt.format(c) for c in range(int(start), int(end) + 1)]
+    
+    return [chr(c) for c in range(ord(start), ord(end) + 1)]
+
+
+#-------------------------------------------------------------------------------
+def get_range_set(text):
+    values = []
+    while text:
+        m = range_re.search(text)
+        if not m:
+            if text:
+                values.extend(list(text))
+            break
+    
+        i, j = m.span()
+        if i:
+            values.extend(list(text[:i]))
+    
+        text = text[j:]
+        start, end = m.group().split('-')
+        values.extend(get_range_run(start, end))
+
+    return values
 
 
 #===============================================================================
@@ -178,9 +189,9 @@ class Loader(object):
         return contents
 
     #---------------------------------------------------------------------------
-    def normalize(self, source, range=None, token=DEFAULT_RANGE_TOKEN):
-        if range:
-            return [source.replace(token, r) for r in parse_range(range)]
+    def normalize(self, source, range_set=None, token=DEFAULT_RANGE_TOKEN):
+        if range_set:
+            return [source.replace(token, r) for r in get_range_set(range_set)]
         
         return [source]
 

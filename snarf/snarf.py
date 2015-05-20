@@ -2,6 +2,8 @@
 import re
 import os
 import copy
+import json
+from pprint import pformat
 from collections import deque
 
 try:
@@ -217,7 +219,7 @@ class HTML(Bits):
 
     #---------------------------------------------------------------------------
     def get_copy(self):
-        return bs4.BeautifulSoup(unicode(self._data))
+        return copy.deepcopy(self._data)
     
     #---------------------------------------------------------------------------
     def _call_cmd(self, cmd, args):
@@ -226,17 +228,25 @@ class HTML(Bits):
         
         soup = self.get_copy()
         for arg in args:
-            for el in soup.find_all(arg):
+            for el in soup.select(arg):
                 method = getattr(el, cmd)
                 method()
                 
         self._update(soup)
         return self
-
     
     #---------------------------------------------------------------------------
     def unwrap(self, tags):
         return self._call_cmd('unwrap', tags)
+    
+    #---------------------------------------------------------------------------
+    def replace_with(self, query, what):
+        soup = self.get_copy()
+        for el in soup.select(query):
+            el.replace_with(what)
+        
+        self._update(soup)
+        return self
         
     #---------------------------------------------------------------------------
     def extract(self, tags):
@@ -271,6 +281,22 @@ class HTML(Bits):
         self._update(soup)
         return self
 
+    #---------------------------------------------------------------------------
+    def serialize(self, query, token='@@@'):
+        results = []
+        for item in self._data.select(query):
+            results.append(token.join([i for i in item.stripped_strings if i]))
+        
+        return results
+
+    #---------------------------------------------------------------------------
+    def collapse(self, query):
+        soup = self.get_copy()
+        for item in soup.select(query):
+            item.string = ' '.join([i for i in item.stripped_strings if i])
+            
+        self._update(soup)
+        return self
 
 #===============================================================================
 class Lines(Bits):
@@ -278,20 +304,27 @@ class Lines(Bits):
     Convenience class for manipulating and traversing lines of text.
     '''
     #---------------------------------------------------------------------------
-    def __init__(self, text):
-        super(Lines, self).__init__(text.splitlines())
+    def __init__(self, data):
+        if utils.is_string(data):
+            data = data.splitlines()
+        super(Lines, self).__init__(data)
 
     #---------------------------------------------------------------------------
     def _find_first(self, what):
         for i, line in enumerate(self._data):
             if matches(line, what):
                 return i
-
+        
     #---------------------------------------------------------------------------
     def __str__(self):
         return u'\n'.join(self._data)
-
+    
     __unicode__ = __str__
+    
+    #---------------------------------------------------------------------------
+    def format(self, fmt):
+        self._update([fmt.format(l) for l in self._data])
+        return self
     
     #---------------------------------------------------------------------------
     def compress(self):
@@ -302,7 +335,7 @@ class Lines(Bits):
     def strip(self):
         self._update([l.strip() for l in self._data])
         return self
-
+        
     #---------------------------------------------------------------------------
     def skip_to(self, what, keep=True):
         found = self._find_first(what)
@@ -310,7 +343,7 @@ class Lines(Bits):
             self._update(self._data[found:])
         
         return self
-
+        
     #----------------------------------------------------------------------------
     def read_until(self, what, keep=True):
         found = self._find_first(what)
@@ -319,7 +352,7 @@ class Lines(Bits):
             self._update(self._data[:found])
         
         return self
-
+        
     #---------------------------------------------------------------------------
     def matches(self, what):
         self._update([l for l in self._data if matches(l, what)])

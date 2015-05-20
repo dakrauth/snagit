@@ -1,14 +1,10 @@
 import re
 import json
+from pprint import pformat
 from . import utils
 from . import snarf
 
 verbose = utils.verbose
-
-#-------------------------------------------------------------------------------
-def content_command(method):
-    method.takes_content = True
-    return method
 
 
 #===============================================================================
@@ -124,6 +120,24 @@ class Program(object):
 #===============================================================================
 class ScriptError(Exception):
     pass
+
+
+#-------------------------------------------------------------------------------
+def register_handler(cls):
+    def decorator(method):
+        def adapter(self, content, args, kws):
+            if cls and not isinstance(content, cls):
+                content = cls(unicode(content))
+            return method(self, content, args, kws)
+        adapter.takes_content = True
+        return adapter
+    return decorator
+
+
+html_handler = register_handler(snarf.HTML)
+text_handler = register_handler(snarf.Text)
+line_handler = register_handler(snarf.Lines)
+generic_handler = register_handler(None)
 
 
 #===============================================================================
@@ -249,30 +263,30 @@ class Script(object):
         verbose('>>> {}', args)
     
     #---------------------------------------------------------------------------
-    @content_command
+    @generic_handler
     def cmd_dumps(self, content, args, kws):
         print unicode(content)
         return content
     
     #---------------------------------------------------------------------------
-    @content_command
+    @generic_handler
     def cmd_text(self, content, args, kws):
         if not isinstance(content, snarf.Text):
             content = snarf.Text(unicode(content))
         return content
     
     #---------------------------------------------------------------------------
-    @content_command
+    @generic_handler
     def cmd_html(self, content, args, kws):
         return snarf.HTML(unicode(content))
     
     #---------------------------------------------------------------------------
-    @content_command
+    @generic_handler
     def cmd_lines(self, content, args, kws):
         return snarf.Lines(unicode(content))
 
     #---------------------------------------------------------------------------
-    @content_command
+    @generic_handler
     def cmd_write(self, content, args, kws):
         data = '\n'.join([unicode(c) for c in self.contents])
         utils.write_file(args[0], data)
@@ -282,51 +296,56 @@ class Script(object):
     #---------------------------------------------------------------------------
 
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_skip_to(self, lines, args, kws):
         return lines.skip_to(*args, **kws)
     
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_read_until(self, lines, args, kws):
         return lines.read_until(*args, **kws)
 
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_strip(self, lines, args, kws):
         return lines.strip()
     
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_end(self, lines, args, kws):
         return lines.end()
     
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_matches(self, lines, args, kws):
         return lines.matches(args[0], **kws)
     
     #---------------------------------------------------------------------------
-    @content_command
+    @line_handler
     def cmd_compress(self, lines, args, kws):
         return lines.compress()
+
+    #---------------------------------------------------------------------------
+    @line_handler
+    def cmd_format(self, lines, args, kws):
+        return lines.format(args[0])
     
     #---------------------------------------------------------------------------
     # Text methods
     #---------------------------------------------------------------------------
 
     #---------------------------------------------------------------------------
-    @content_command
+    @text_handler
     def cmd_normalize(self, text, args, kws):
         return text.normalize()
     
     #---------------------------------------------------------------------------
-    @content_command
+    @text_handler
     def cmd_remove(self, text, args, kws):
         return text.remove_all(args, **kws)
     
     #---------------------------------------------------------------------------
-    @content_command
+    @text_handler
     def cmd_replace(self, text, args, kws):
         args = args[:]
         replacement = args.pop()
@@ -338,12 +357,12 @@ class Script(object):
     #---------------------------------------------------------------------------
 
     #---------------------------------------------------------------------------
-    @content_command
+    @html_handler
     def cmd_remove_attrs(self, text, args, kws):
         return text.remove_attrs(args[0] if args else None, **kws)
     
     #---------------------------------------------------------------------------
-    @content_command
+    @html_handler
     def cmd_unwrap(self, text, args, kws):
         for tag in args:
             text = text.unwrap(tag, **kws)
@@ -351,7 +370,7 @@ class Script(object):
         return text
 
     #---------------------------------------------------------------------------
-    @content_command
+    @html_handler
     def cmd_extract(self, text, args, kws):
         for tag in args:
             text = text.extract(tag, **kws)
@@ -359,13 +378,30 @@ class Script(object):
         return text
     
     #---------------------------------------------------------------------------
-    @content_command
+    @html_handler
     def cmd_select(self, text, args, kws):
-        for arg in args:
-            text = text.select(arg)
-        
+        text = text.select(args[0])
         return text
 
+    #---------------------------------------------------------------------------
+    @html_handler
+    def cmd_replace_tag(self, text, args, kws):
+        text = text.replace_with(args[0], args[1])
+        return text
+    
+    #---------------------------------------------------------------------------
+    @html_handler
+    def cmd_serialize(self, text, args, kws):
+        return snarf.Lines(text.serialize(args[0], **kws))
+
+    #---------------------------------------------------------------------------
+    @html_handler
+    def cmd_collapse(self, text, args, kws):
+        for arg in args:
+            text = text.collapse(arg)
+        return text
+    
+    
 #-------------------------------------------------------------------------------
 def execute_script(filename, contents):
     code = utils.read_file(filename)
