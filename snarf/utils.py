@@ -16,7 +16,7 @@ except ImportError:
 
 logger = logging.getLogger('snarf')
 
-DEFAULT_RANGE_TOKEN = '@@@'
+DEFAULT_DELIMITER = DEFAULT_RANGE_TOKEN = '@@@'
 
 
 #---------------------------------------------------------------------------
@@ -108,11 +108,11 @@ def get_range_set(text):
             if text:
                 values.extend(list(text))
             break
-    
+        
         i, j = m.span()
         if i:
             values.extend(list(text[:i]))
-    
+        
         text = text[j:]
         start, end = m.group().split('-')
         values.extend(get_range_run(start, end))
@@ -127,6 +127,25 @@ class Loader(object):
     def __init__(self):
         self.cache_dir = None
     
+    #---------------------------------------------------------------------------
+    @staticmethod
+    def load_history(base_dir='~', snarf_dir='.snarf', filename='history'):
+        try:
+            import readline, atexit
+        except ImportError:
+            return
+        
+        parent_dir = os.path.join(absolute_filename(base_dir), snarf_dir)
+        makedirs(parent_dir)
+        histfile = os.path.join(parent_dir, filename)
+        
+        try:
+            readline.read_history_file(histfile)
+        except IOError:
+            pass
+        
+        atexit.register(readline.write_history_file, histfile)
+        
     #---------------------------------------------------------------------------
     def use_cache(self, base_dir='~', snarf_dir='.snarf', cache_dir='cache'):
         self.cache_dir = os.path.join(absolute_filename(base_dir), snarf_dir, cache_dir)
