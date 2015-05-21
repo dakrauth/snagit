@@ -219,7 +219,8 @@ class HTML(Bits):
 
     #---------------------------------------------------------------------------
     def get_copy(self):
-        return copy.deepcopy(self._data)
+        return bs4.BeautifulSoup(unicode(self._data))
+        #return copy.deepcopy(self._data)
     
     #---------------------------------------------------------------------------
     def _call_cmd(self, cmd, args):
@@ -265,6 +266,17 @@ class HTML(Bits):
         return self
 
     #---------------------------------------------------------------------------
+    def select_attr(self, query, attr, test=bool):
+        results = []
+        for el in self._data.select(query):
+            if el.attrs and attr in el.attrs:
+                value = el.attrs[attr]
+                if test(value):
+                    results.append(value)
+
+        return results
+
+    #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
         if utils.is_string(attrs):
             attrs = attrs if attrs == '*' else attrs.split(',')
@@ -290,10 +302,10 @@ class HTML(Bits):
         return results
 
     #---------------------------------------------------------------------------
-    def collapse(self, query):
+    def collapse(self, query, joiner=' '):
         soup = self.get_copy()
         for item in soup.select(query):
-            item.string = ' '.join([i for i in item.stripped_strings if i])
+            item.string = joiner.join([s.strip() for s in item.text.split()])
             
         self._update(soup)
         return self

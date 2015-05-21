@@ -1,3 +1,4 @@
+import os
 import re
 import json
 from pprint import pformat
@@ -5,6 +6,18 @@ from . import utils
 from . import snarf
 
 verbose = utils.verbose
+set_trace = utils.pdb.set_trace
+
+utils.Loader.load_history()
+
+#-------------------------------------------------------------------------------
+def escaped(txt):
+    for cin, cout in (
+        ('\\n', '\n'),
+        ('\\t', '\t')
+    ):
+        txt = txt.replace(cin, cout)
+    return txt
 
 
 #===============================================================================
@@ -39,9 +52,9 @@ class Instruction(object):
         elif s in self.value_dict:
             return self.value_dict[s]
         elif s.startswith('r'):
-            return re.compile(s[2:-1])
+            return re.compile(escaped(s[2:-1]))
         
-        return s[1:-1]
+        return escaped(s[1:-1])
 
     #---------------------------------------------------------------------------
     def parse(self, text):
@@ -183,7 +196,7 @@ class Script(object):
             
             if line.startswith('?'):
                 line = line[1:].strip()
-                utils.pdb.set_trace()
+                set_trace()
             
             instrs = self.program.compile(line)
             try:
@@ -208,7 +221,7 @@ class Script(object):
             new_contents = []
             for content in self.contents:
                 try:
-                    if do_break: utils.pdb.set_trace()
+                    if do_break: set_trace()
                     new_content = method(content, instr.args, instr.kws)
                 except Exception as exc:
                     exc.args += ('Line {}'.format(instr.lineno),)
@@ -219,7 +232,7 @@ class Script(object):
             self.contents = new_contents
         else:
             try:
-                if do_break: utils.pdb.set_trace()
+                if do_break: set_trace()
                 method(instr.args, instr.kws)
             except Exception as exc:
                 exc.args += ('Line {}'.format(instr.lineno),)
@@ -380,14 +393,18 @@ class Script(object):
     #---------------------------------------------------------------------------
     @html_handler
     def cmd_select(self, text, args, kws):
-        text = text.select(args[0])
-        return text
+        return text.select(args[0])
 
     #---------------------------------------------------------------------------
     @html_handler
+    def cmd_select_attr(self, text, args, kws):
+        results = text.select_attr(args[0], args[1])
+        return snarf.Lines(results)
+        
+    #---------------------------------------------------------------------------
+    @html_handler
     def cmd_replace_tag(self, text, args, kws):
-        text = text.replace_with(args[0], args[1])
-        return text
+        return text.replace_with(args[0], args[1])
     
     #---------------------------------------------------------------------------
     @html_handler
@@ -398,7 +415,7 @@ class Script(object):
     @html_handler
     def cmd_collapse(self, text, args, kws):
         for arg in args:
-            text = text.collapse(arg)
+            text = text.collapse(arg, **kws)
         return text
     
     
