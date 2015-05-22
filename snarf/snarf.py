@@ -15,6 +15,7 @@ from . import utils
 from . import markup
 
 is_string = utils.is_string
+verbose = utils.verbose
 
 attr_pattern = r'''((?:\s+)([\w:-]+)=('[^']*'|"[^"]*"|[\w.:;&#-]+))'''
 attr_re = re.compile(attr_pattern)
@@ -103,11 +104,18 @@ def matches(text, what):
     return what.match(text)
 
 
+#-------------------------------------------------------------------------------
+def beautiful_results(results):
+    soup = bs4.BeautifulSoup()
+    soup.contents = results
+    return soup
+
+
 #===============================================================================
 class Bits(object):
 
     #---------------------------------------------------------------------------
-    def __init__(self, data):
+    def __init__(self, data=''):
         self._data = data
         self._stack = []
     
@@ -122,9 +130,25 @@ class Bits(object):
         return len(self._data)
     
     #---------------------------------------------------------------------------
+    def __iter__(self):
+        return iter(self._data)
+
+    #---------------------------------------------------------------------------
     def _update(self, data):
         self._stack.append(self._data)
         self._data = data
+    
+    #---------------------------------------------------------------------------
+    def serialize(self, results, format='python', variable='data'):
+        if format == 'python':
+            if isinstance(results, (list, tuple)):
+                results = pformat(results)
+            else:
+                results = "'''{}'''".format(results)
+
+            return '{} = {}'.format(variable, results)
+        
+        raise ValueError('Unknown serialization format: {}'.format(format))
     
     #---------------------------------------------------------------------------
     @property
@@ -146,25 +170,37 @@ class Bits(object):
         self._data = self._stack.pop()
         return self
 
+    #---------------------------------------------------------------------------
+    @classmethod
+    def combine(cls, contents):
+        if not contents:
+            return Bits()
+            
+        c = contents[0]
+        if isinstance(c, Lines):
+            lines = []
+            for li in contents:
+                lines.extend(li._data)
+            return Lines(lines)
+        elif isinstance(c, HTML):
+            soup = bs4.BeautifulSoup()
+            for doc in contents:
+                soup.contents.extend(doc.body())
+            return HTML(soup)
+        else:
+            return Text('\n'.join(item._data for item in contents))
+
 
 #===============================================================================
 class Text(Bits):
     '''
-    Text handler class for manipulating a block text/HTML.
+    Text handler class for manipulating a block text.
     '''
-
-    #---------------------------------------------------------------------------
-    def __init__(self, text):
-        super(Text, self).__init__(text)
     
     #---------------------------------------------------------------------------
-    def normalize(self):
-        '''
-        Convert all single quoted tag attributes to double quotes
-        '''
-        self._update(normalize_attrs(self._data))
-        return self
-        
+    def __iter__(self):
+        return iter(self._data.splitlines())
+    
     #---------------------------------------------------------------------------
     def remove_all(self, what, **kws):
         self._update(remove_all(self._data, what, **kws))
@@ -174,32 +210,6 @@ class Text(Bits):
     def replace_all(self, items, **kws):
         self._update(replace_all(self._data, items, **kws))
         return self
-        
-    #---------------------------------------------------------------------------
-    def remove_tags(self, tags):
-        if utils.is_string(tags):
-            tags = tags.split(',')
-        
-        data = self._data
-        for tag in tags:
-            tag_re = re.compile(r'</?%s(>| [^>]*>)' % tag, re.IGNORECASE)
-            data = replace(self._data, tag_re, '')
-            
-        self._update(data)
-        return self
-        
-    #---------------------------------------------------------------------------
-    def remove_attrs(self, attrs=None):
-        if utils.is_string(attrs):
-            attrs = attrs.split(',')
-        
-        attrs = '|'.join(attrs or HTML.BAD_ATTRS)
-        self._update(replace(
-            self._data,
-            re.compile(' (' + attrs + ')="[^"]*"', flags=re.IGNORECASE),
-            ''
-        ))
-        return self
 
 
 #===============================================================================
@@ -208,8 +218,10 @@ class HTML(Bits):
     BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
     
     #---------------------------------------------------------------------------
-    def __init__(self, text):
-        super(HTML, self).__init__(bs4.BeautifulSoup(text))
+    def __init__(self, data):
+        if is_string(data):
+            data = bs4.BeautifulSoup(data)
+        super(HTML, self).__init__(data)
 
     #---------------------------------------------------------------------------
     def __unicode__(self):
@@ -256,12 +268,9 @@ class HTML(Bits):
     #---------------------------------------------------------------------------
     def select(self, query):
         results = self._data.select(query)
+        verbose('Selected {} matches', len(results))
         if results:
-            soup = bs4.BeautifulSoup()
-            for el in results:
-                soup.append(el)
-            
-            self._update(soup)
+            self._update(beautiful_results(results))
 
         return self
 
@@ -274,7 +283,7 @@ class HTML(Bits):
                 if test(value):
                     results.append(value)
 
-        return results
+        return Lines(results)
 
     #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
@@ -294,12 +303,12 @@ class HTML(Bits):
         return self
 
     #---------------------------------------------------------------------------
-    def serialize(self, query, token='@@@'):
+    def serialize(self, query):
         results = []
         for item in self._data.select(query):
-            results.append(token.join([i for i in item.stripped_strings if i]))
+            results.append([i for i in item.stripped_strings if i])
         
-        return results
+        return super(HTML, self).serialize(results)
 
     #---------------------------------------------------------------------------
     def collapse(self, query, joiner=' '):

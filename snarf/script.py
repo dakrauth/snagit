@@ -8,8 +8,6 @@ from . import snarf
 verbose = utils.verbose
 set_trace = utils.pdb.set_trace
 
-utils.Loader.load_history()
-
 #-------------------------------------------------------------------------------
 def escaped(txt):
     for cin, cout in (
@@ -83,11 +81,13 @@ class Program(object):
     
     
     #---------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, code=''):
         self.lineno = 1
         self.code = ''
         self.lines = []
         self.instructions = []
+        if code:
+            self.compile(code)
 
     #---------------------------------------------------------------------------
     def compile(self, code):
@@ -158,25 +158,31 @@ class Script(object):
     
     #---------------------------------------------------------------------------
     def __init__(self, code='', contents=None, loader=None, use_cache=False):
-        self.loader = loader if loader else utils.Loader()
-        if use_cache:
-            self.loader.use_cache()
-            
+        self.loader = loader if loader else utils.Loader(use_cache)
         self.set_contents(contents)
         self.do_break = False
-        self.program = Program()
-        if code:
-            self.program.compile(code)
+        self.program = Program(code)
         
     #---------------------------------------------------------------------------
     def set_contents(self, contents):
+        self.contents = []
         if contents:
             if utils.is_string(contents):
                 contents = [contents]
-                
-            self.contents = [snarf.Text(unicode(c)) for c in contents]
-        else:
-            self.contents = []
+            
+            for content in contents:
+                if not isinstance(content, snarf.Bits):
+                    if utils.is_string(content):
+                        c = content.strip()
+                        content = (
+                            snarf.HTML(content)
+                            if c.startswith('<') and c.endswith('>')
+                            else snarf.Text(content)
+                        )
+                    else:
+                        content = snarf.Lines(unicode(content))
+                        
+                self.contents.append(content)
     
     #---------------------------------------------------------------------------
     def get_command(self, cmd):
@@ -184,6 +190,7 @@ class Script(object):
         
     #---------------------------------------------------------------------------
     def repl(self):
+        self.loader.load_history()
         print 'Type "help" for more information. Ctrl+c to exit'
         while True:
             try:
@@ -194,7 +201,7 @@ class Script(object):
             if not line:
                 continue
             
-            if line.startswith('?'):
+            if line.startswith('!'):
                 line = line[1:].strip()
                 set_trace()
             
@@ -259,6 +266,17 @@ class Script(object):
         )
     
     #---------------------------------------------------------------------------
+    def cmd_combine(self, args, kws):
+        if len(self.contents) > 1:
+            self.set_contents(Bits.combine(self.contents))
+    
+    #---------------------------------------------------------------------------
+    def cmd_serialize(self, args, kws):
+        self.cmd_combine((), {})
+        content = self.contents[0]
+        self.set_contents(content.serialize(args, **kws))
+    
+    #---------------------------------------------------------------------------
     def cmd_cache(self, args, kws):
         self.loader.use_cache()
     
@@ -266,6 +284,14 @@ class Script(object):
     def cmd_load(self, args, kws):
         contents = self.loader.load(args, **kws)
         self.set_contents(contents)
+    
+    #---------------------------------------------------------------------------
+    def cmd_load_all(self, args, kws):
+        sources = []
+        for content in self.contents:
+            sources.extend(list(content))
+        
+        self.cmd_load(sources, **kws)
     
     #---------------------------------------------------------------------------
     def cmd_break(self, args, kws):
@@ -284,19 +310,17 @@ class Script(object):
     #---------------------------------------------------------------------------
     @generic_handler
     def cmd_text(self, content, args, kws):
-        if not isinstance(content, snarf.Text):
-            content = snarf.Text(unicode(content))
-        return content
+        return content.text
     
     #---------------------------------------------------------------------------
     @generic_handler
     def cmd_html(self, content, args, kws):
-        return snarf.HTML(unicode(content))
+        return content.html
     
     #---------------------------------------------------------------------------
     @generic_handler
     def cmd_lines(self, content, args, kws):
-        return snarf.Lines(unicode(content))
+        return content.lines
 
     #---------------------------------------------------------------------------
     @generic_handler
@@ -347,11 +371,6 @@ class Script(object):
     # Text methods
     #---------------------------------------------------------------------------
 
-    #---------------------------------------------------------------------------
-    @text_handler
-    def cmd_normalize(self, text, args, kws):
-        return text.normalize()
-    
     #---------------------------------------------------------------------------
     @text_handler
     def cmd_remove(self, text, args, kws):
@@ -406,11 +425,6 @@ class Script(object):
     def cmd_replace_tag(self, text, args, kws):
         return text.replace_with(args[0], args[1])
     
-    #---------------------------------------------------------------------------
-    @html_handler
-    def cmd_serialize(self, text, args, kws):
-        return snarf.Lines(text.serialize(args[0], **kws))
-
     #---------------------------------------------------------------------------
     @html_handler
     def cmd_collapse(self, text, args, kws):

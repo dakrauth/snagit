@@ -2,6 +2,7 @@ import re
 import os
 import codecs
 import logging
+import itertools
 from urlparse import urlparse, ParseResult
 
 try:
@@ -85,6 +86,9 @@ def read_file(filename, encoding='utf8'):
         return fp.read()
 
 
+#-------------------------------------------------------------------------------
+def flatten(lists):
+    return itertools.chain(*lists)
 
 range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
 
@@ -124,8 +128,10 @@ def get_range_set(text):
 class Loader(object):
     
     #---------------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, use_cache=False, **kws):
         self.cache_dir = None
+        if use_cache:
+            self.use_cache(**kws)
     
     #---------------------------------------------------------------------------
     @staticmethod
@@ -168,16 +174,15 @@ class Loader(object):
         return dirname, os.path.join(dirname, pth)
         
     #---------------------------------------------------------------------------
-    def load(self, sources, range=None, token=DEFAULT_RANGE_TOKEN):
+    def load(self, sources, range_set=None, token=DEFAULT_RANGE_TOKEN):
         if is_string(sources):
             sources = [sources]
         
-        normalized = []
-        for src in sources:
-            normalized.extend(self.normalize(src, range, token))
+        if range_set:
+            sources = self.normalize(sources, range_set, token=token)
         
         contents = []
-        for src in normalized:
+        for src in sources:
             verbose('Loading {}', src)
             urlp = urlparse(src)
             data = None
@@ -208,9 +213,11 @@ class Loader(object):
         return contents
 
     #---------------------------------------------------------------------------
-    def normalize(self, source, range_set=None, token=DEFAULT_RANGE_TOKEN):
-        if range_set:
-            return [source.replace(token, r) for r in get_range_set(range_set)]
+    def normalize(self, sources, range_set, token=DEFAULT_RANGE_TOKEN):
+        results = []
+        chars = get_range_set(range_set)
+        for source in sources:
+            results.extend([source.replace(token, c) for c in chars])
         
-        return [source]
+        return results
 

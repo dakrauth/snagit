@@ -33,7 +33,7 @@ def parse_args(args=None):
 
 
 #-------------------------------------------------------------------------------
-def main(prog_args):
+def main(prog_args=None):
     args = parse_args(prog_args)
     start = datetime.now()
     if args.pdb:

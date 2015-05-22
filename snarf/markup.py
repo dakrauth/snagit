@@ -173,7 +173,7 @@ class BS4Formatter(HTMLFormatter):
     def format(cls, el, depth=0, prefix='    ', doctype=True):
         st = ''
         start = 0
-        if isinstance(el, bs4.BeautifulSoup):
+        if isinstance(el, bs4.BeautifulSoup) and el.contents:
             first = el.contents[0]
             if isinstance(first, bs4.Doctype):
                 st += unicode(first.output_ready())
