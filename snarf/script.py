@@ -21,16 +21,20 @@ def escaped(txt):
 #===============================================================================
 class Instruction(object):
     
-    values_pat = r'''(
+    values_pat = r'''
         r?'(?:(\'|[^'])*?)'   |
         r?"(?:(\"|[^"])*?)"   |
-        (\d+)               |
-        (True|False|None)
-    )\s*'''
+        (\d+)                 |
+        (True|False|None)     |
+        ([\S]+)
+    '''
 
-    args_re = re.compile(r'^%s' % values_pat, re.VERBOSE)
-    kwds_re = re.compile(r'^(\w+)=%s' % values_pat, re.VERBOSE)
+    args_re = re.compile(r'^((?P<kwd>\w+)=(?P<val>%s)|(?P<arg>%s))\s*' % (values_pat, values_pat), re.VERBOSE)
     value_dict = {'True': True, 'False': False, 'None': None}
+    
+    #---------------------------------------------------------------------------
+    def __repr__(self):
+        return '<Instruction({}): {}, {}>'.format(self.cmd, self.args, self.kws)
     
     #---------------------------------------------------------------------------
     def __init__(self, program, line, lineno):
@@ -49,10 +53,12 @@ class Instruction(object):
             return int(s)
         elif s in self.value_dict:
             return self.value_dict[s]
-        elif s.startswith('r'):
+        elif s.startswith(('r"', "r'")):
             return re.compile(escaped(s[2:-1]))
-        
-        return escaped(s[1:-1])
+        elif s.startswith(('"', "'")):
+            return escaped(s[1:-1])
+        else:
+            return s.strip()
 
     #---------------------------------------------------------------------------
     def parse(self, text):
@@ -60,16 +66,14 @@ class Instruction(object):
             m = self.args_re.search(text)
             if not m:
                 break
-        
-            self.args.append(self.get_value(m.group(1)))
-            text = text[len(m.group()):]
-        
-        while text:
-            m = self.kwds_re.search(text)
-            if not m:
-                break
             
-            self.kws[m.group(1)] = self.get_value(m.group(2))
+            gdict = m.groupdict()
+            kwd = gdict.get('kwd')
+            if kwd:
+                self.kws[kwd] = self.get_value(gdict.get('val', ''))
+            else:
+                self.args.append(self.get_value(gdict.get('arg', '')))
+
             text = text[len(m.group()):]
         
         if text:
