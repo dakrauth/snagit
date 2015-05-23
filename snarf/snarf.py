@@ -303,10 +303,13 @@ class HTML(Bits):
         return self
 
     #---------------------------------------------------------------------------
-    def serialize(self, query):
+    def serialize(self, queries): # query):
         results = []
+        # for item in self._data.select(query):
+        #     results.append([i.strip() for i in item.strings])
+
         for item in self._data.select(query):
-            results.append([i for i in item.stripped_strings if i])
+            results.append([i.strip() for i in item.strings])
         
         return super(HTML, self).serialize(results)
 

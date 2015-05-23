@@ -274,7 +274,7 @@ class Script(object):
     def cmd_serialize(self, args, kws):
         self.cmd_combine((), {})
         content = self.contents[0]
-        self.set_contents(content.serialize(args, **kws))
+        self.set_contents(content.serialize(args[0] if args else None, **kws))
     
     #---------------------------------------------------------------------------
     def cmd_cache(self, args, kws):
