@@ -291,7 +291,7 @@ class Script(object):
         for content in self.contents:
             sources.extend(list(content))
         
-        self.cmd_load(sources, **kws)
+        self.cmd_load(sources, kws)
     
     #---------------------------------------------------------------------------
     def cmd_break(self, args, kws):

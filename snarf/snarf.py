@@ -303,13 +303,23 @@ class HTML(Bits):
         return self
 
     #---------------------------------------------------------------------------
-    def serialize(self, queries): # query):
+    def serialize(self, query): # query):
         results = []
         # for item in self._data.select(query):
         #     results.append([i.strip() for i in item.strings])
-
+        
+        current = results
         for item in self._data.select(query):
-            results.append([i.strip() for i in item.strings])
+            values = []
+            results.append(values)
+            for content in item.contents:
+                if isinstance(content, bs4.NavigableString):
+                    content = content.strip()
+                    if content:
+                        values.append(content)
+                else:
+                    content = content.string
+                    values.append(content.strip() if content else '')
         
         return super(HTML, self).serialize(results)
 
