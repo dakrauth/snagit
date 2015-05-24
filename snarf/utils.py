@@ -35,6 +35,16 @@ def is_string(obj):
 
 
 #-------------------------------------------------------------------------------
+def is_regex(obj):
+    return hasattr(obj, 'pattern')
+
+
+#-------------------------------------------------------------------------------
+def seq(what):
+    return [what] if is_string(what) else what
+
+
+#-------------------------------------------------------------------------------
 def configure_logger(debug=False):
     if debug:
         console = logging.StreamHandler()

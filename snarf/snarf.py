@@ -17,26 +17,9 @@ from . import markup
 is_string = utils.is_string
 verbose = utils.verbose
 
-attr_pattern = r'''((?:\s+)([\w:-]+)=('[^']*'|"[^"]*"|[\w.:;&#-]+))'''
-attr_re = re.compile(attr_pattern)
-start_tag_re = re.compile(r'''<([\w:-]+)(%s+)>''' % (attr_pattern,))
 
 #-------------------------------------------------------------------------------
-def normalize_attrs(text):
-    def replacement(m):
-        tag = m.group(1)
-        attrs = []
-        for m2 in attr_re.finditer(m.group(2)):
-            value = m2.group(3)
-            if value.startswith(("'", '"')):
-                value = value[1:-1]
-            attrs.append(u' {}="{}"'.format(m2.group(2), value))
-        return u'<{}{}>'.format(tag, ''.join(attrs))
-    return start_tag_re.sub(replacement, text)
-
-
-#-------------------------------------------------------------------------------
-def replace(text, old, new, strip=False):
+def replace(text, old, new, count=None, strip=False):
     '''
     Replace a subset of ``text``.
     
@@ -44,9 +27,9 @@ def replace(text, old, new, strip=False):
     
     '''
     if is_string(old):
-        text = text.replace(old, new)
+        text = text.replace(old, new, -1 if count is None else count)
     else:
-        text = old.sub(new, text)
+        text = old.sub(new, text, 0 if count is None else count)
     
     if strip:
         text = text.strip(None if strip == True else strip)
@@ -55,21 +38,22 @@ def replace(text, old, new, strip=False):
 
 
 #-------------------------------------------------------------------------------
-def remove(text, what, strip=False):
+def remove(text, what, count=None, strip=False):
     return replace(text, what, '', strip=strip)
 
 
+
 #-------------------------------------------------------------------------------
-def replace_all(text, items):
-    for a,b in items:
-        text = replace(text, a, b)
+def replace_each(text, items, count=None, strip=False):
+    for a,b in utils.seq(items):
+        text = replace(text, a, b, count=count, strip=strip)
     return text
 
 
 #-------------------------------------------------------------------------------
-def remove_all(text, items, strip=False):
-    for item in items:
-        text = remove(text, item, strip=strip)
+def remove_each(text, items, count=None, strip=False):
+    for item in utils.seq(items):
+        text = remove(text, item, count=count, strip=strip)
     return text
 
 
@@ -85,14 +69,6 @@ def splitter(text, tok, expected=2, default=None, strip=False):
         n += 1
     
     return bits
-
-
-#-------------------------------------------------------------------------------
-def clean_html_entities(text):
-    return replace_all(text,
-        ('&amp;', '&'),
-        ('&nbsp;', ' '),
-    )
 
 
 #-------------------------------------------------------------------------------
@@ -148,6 +124,9 @@ class Bits(object):
 
             return '{} = {}'.format(variable, results)
         
+        elif format == 'json':
+            return json.dumps(results)
+            
         raise ValueError('Unknown serialization format: {}'.format(format))
     
     #---------------------------------------------------------------------------
@@ -202,13 +181,13 @@ class Text(Bits):
         return iter(self._data.splitlines())
     
     #---------------------------------------------------------------------------
-    def remove_all(self, what, **kws):
-        self._update(remove_all(self._data, what, **kws))
+    def remove_each(self, items, **kws):
+        self._update(remove_each(self._data, items, **kws))
         return self
         
     #---------------------------------------------------------------------------
-    def replace_all(self, items, **kws):
-        self._update(replace_all(self._data, items, **kws))
+    def replace_each(self, items, **kws):
+        self._update(replace_each(self._data, items, **kws))
         return self
 
 
@@ -228,18 +207,19 @@ class HTML(Bits):
         return markup.bs4format(self._data)
     
     __str__ = __unicode__
-
+    
     #---------------------------------------------------------------------------
-    def get_copy(self):
+    @property
+    def soup(self):
         return bs4.BeautifulSoup(unicode(self._data))
         #return copy.deepcopy(self._data)
     
     #---------------------------------------------------------------------------
     def _call_cmd(self, cmd, args):
-        if utils.is_string(args):
+        if is_string(args):
             args = args.split(',')
         
-        soup = self.get_copy()
+        soup = self.soup
         for arg in args:
             for el in soup.select(arg):
                 method = getattr(el, cmd)
@@ -254,7 +234,7 @@ class HTML(Bits):
     
     #---------------------------------------------------------------------------
     def replace_with(self, query, what):
-        soup = self.get_copy()
+        soup = self.soup
         for el in soup.select(query):
             el.replace_with(what)
         
@@ -287,11 +267,11 @@ class HTML(Bits):
 
     #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
-        if utils.is_string(attrs):
+        if is_string(attrs):
             attrs = attrs if attrs == '*' else attrs.split(',')
 
         attrs = attrs or HTML.BAD_ATTRS
-        soup = self.get_copy()
+        soup = self.soup
         for el in soup.descendants:
             if hasattr(el, 'attrs'):
                 if attrs == '*':
@@ -305,10 +285,6 @@ class HTML(Bits):
     #---------------------------------------------------------------------------
     def serialize(self, query): # query):
         results = []
-        # for item in self._data.select(query):
-        #     results.append([i.strip() for i in item.strings])
-        
-        current = results
         for item in self._data.select(query):
             values = []
             results.append(values)
@@ -325,12 +301,13 @@ class HTML(Bits):
 
     #---------------------------------------------------------------------------
     def collapse(self, query, joiner=' '):
-        soup = self.get_copy()
+        soup = self.soup
         for item in soup.select(query):
             item.string = joiner.join([s.strip() for s in item.text.split()])
             
         self._update(soup)
         return self
+
 
 #===============================================================================
 class Lines(Bits):
@@ -339,7 +316,7 @@ class Lines(Bits):
     '''
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        if utils.is_string(data):
+        if is_string(data):
             data = data.splitlines()
         super(Lines, self).__init__(data)
 

@@ -378,7 +378,7 @@ class Script(object):
     #---------------------------------------------------------------------------
     @text_handler
     def cmd_remove(self, text, args, kws):
-        return text.remove_all(args, **kws)
+        return text.remove_each(args, **kws)
     
     #---------------------------------------------------------------------------
     @text_handler
@@ -386,7 +386,7 @@ class Script(object):
         args = args[:]
         replacement = args.pop()
         args = [(a, replacement) for a in args]
-        return text.replace_all(args, **kws)
+        return text.replace_each(args, **kws)
     
     #---------------------------------------------------------------------------
     # HTML methods
