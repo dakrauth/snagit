@@ -351,6 +351,8 @@ class Lines(Bits):
     def skip_to(self, what, keep=True):
         found = self._find_first(what)
         if found is not None:
+            if not keep:
+                found += 1
             self._update(self._data[found:])
         
         return self
@@ -359,7 +361,8 @@ class Lines(Bits):
     def read_until(self, what, keep=True):
         found = self._find_first(what)
         if found is not None:
-            found = found + 1 if keep else found
+            if keep:
+                found += 1
             self._update(self._data[:found])
         
         return self
