@@ -62,94 +62,86 @@ def display(what):
     print what
     print '~' * 60
 
-#-------------------------------------------------------------------------------
-def test_simple():
-    lines = Lines(SOME_LINES)
-    lines.compress()
-    display(unicode(lines))
-    assert unicode(lines) == '''foo bar baz
-spam
-xxxxxxxx
-zzzz
-123
-u6ejtryn
-456'''
+
+#===============================================================================
+class TestLines(object):
+
+    #---------------------------------------------------------------------------
+    def test_simple(self):
+        lines = Lines(SOME_LINES)
+        lines.compress()
+        assert unicode(lines) == '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456'''
     
-    lines.skip_to('123', False)
-    display(unicode(lines))
-    assert unicode(lines) == 'u6ejtryn\n456'
+        lines.skip_to('123', False)
+        assert unicode(lines) == 'u6ejtryn\n456'
     
-    lines.read_until('456', False)
-    display(unicode(lines))
-    assert unicode(lines) == u'u6ejtryn'
+        lines.read_until('456', False)
+        assert unicode(lines) == u'u6ejtryn'
     
-    lines.end()
-    display(unicode(lines))
-    assert unicode(lines) == u'u6ejtryn\n456'
+        lines.end()
+        assert unicode(lines) == u'u6ejtryn\n456'
 
 
-#-------------------------------------------------------------------------------
-def val_repr(val):
-    if hasattr(val, 'pattern'):
-        return '/{}/'.format(val.pattern)
-    
-    if isinstance(val, basestring):
-        return repr(val)
-        
-    return val
+#===============================================================================
+class TestInstructions(object):
 
-#-------------------------------------------------------------------------------
-def do_instr(line, expect):
-    cmd, args, kws = expect
-    prog = script.Program(line)
-    inst = prog.instructions[0]
-    
-    assert inst.cmd == cmd
-    assert inst.args == args
-    assert inst.kws == kws
+    #---------------------------------------------------------------------------
+    def _do_instruction(self, line, expect):
+        cmd, args, kws = expect
+        prog = script.Program(line)
+        inst = prog.instructions[0]
+
+        assert inst.cmd == cmd
+        for actual, expect in zip(inst.args, args):
+            if hasattr(expect, 'pattern'):
+                assert expect.pattern == actual.pattern
+            else:
+                assert actual == expect
+            
+        assert inst.kws == kws
+
+    #---------------------------------------------------------------------------
+    def test_instruction1(self):
+        self._do_instruction("foo bar 'baz spam'", ('foo', ['bar', 'baz spam'], {}))
+
+    #---------------------------------------------------------------------------
+    def test_instruction2(self):
+        self._do_instruction("x r'[abc]'", ('x', [R('[abc]')], {}))
+
+    #---------------------------------------------------------------------------
+    def test_instruction3(self):
+        self._do_instruction("z foo=bar baz 'foo'", (
+            'z',
+            ['baz', 'foo'],
+            {'foo': 'bar'}
+        ))
+
+    #---------------------------------------------------------------------------
+    def test_instruction4(self):
+        self._do_instruction("""replace r'a+b' x='a b c' y=23 z=True baz=r'spam+'""", (
+            'replace',
+            [R('a+b')],
+            {'x': 'a b c', 'y': 23, 'z': True, 'baz': R('spam+')}
+        ))
+
+    #---------------------------------------------------------------------------
+    def test_instruction5(self):
+        self._do_instruction("""commandx _=34 __=None""", (
+            'commandx',
+            [],
+            {'_': 34, '__': None}
+        ))
+
+    #---------------------------------------------------------------------------
+    def test_instruction6(self):
+        self._do_instruction("""command abc7 'True' _ _=34 __=None""", (
+            'command',
+            ['abc7', 'True', '_'],
+            {'_': 34, '__': None}
+        ))
 
 
-#-------------------------------------------------------------------------------
-def test_instrs1():
-    do_instr("foo bar 'baz spam'", ('foo', ['bar', 'baz spam'], {}))
-
-
-#-------------------------------------------------------------------------------
-def test_instrs2():
-    do_instr("x r'[abc]'", ('x', [R('[abc]')], {}))
-
-
-#-------------------------------------------------------------------------------
-def test_instrs3():
-    do_instr("z foo=bar baz 'foo'", ('z', ['baz', 'foo'], {'foo': 'bar'}))
-
-
-#-------------------------------------------------------------------------------
-def test_instrs4():
-    do_instr("""replace r'a+b' x='a b c' y=23 z=True baz=r'spam+'""", (
-        'replace',
-        [R('a+b')],
-        {'x': 'a b c', 'y': 23, 'z': True, 'baz': R('spam+')}
-    ))
-
-
-#-------------------------------------------------------------------------------
-def test_instrs5():
-    do_instr("""commandx _=34 __=None""", (
-        'commandx',
-        [],
-        {'_': 34, '__': None}
-    ))
-
-
-#-------------------------------------------------------------------------------
-def test_instrs6():
-    do_instr("""command abc7 'True' _ _=34 __=None""", (
-        'command',
-        ['abc7', 'True', '_'],
-        {'_': 34, '__': None}
-    ))
-
+################################################################################
 if __name__ == '__main__':
     pdb.set_trace()
-    test_instrs6()
+    TestInstructions().test_instruction4()
