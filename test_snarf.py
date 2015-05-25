@@ -1,7 +1,9 @@
 import re
 import sys
-from snarf.snarf import Lines, Text
+import unittest
+from snarf.snarf import Lines, Text, HTML
 from snarf import script
+from snarf import utils
 try:
     import ipdb as pdb
 except ImportError:
@@ -93,7 +95,7 @@ class TestInstructions(object):
 
         assert inst.cmd == cmd
         for actual, expect in zip(inst.args, args):
-            if hasattr(expect, 'pattern'):
+            if utils.is_regex(expect):
                 assert expect.pattern == actual.pattern
             else:
                 assert actual == expect
@@ -141,7 +143,44 @@ class TestInstructions(object):
         ))
 
 
+#===============================================================================
+class TestHTML(unittest.TestCase):
+    
+    EXPECTED_HTML = '''<html>
+<head>
+    <title>Links</title>
+</head>
+<body>
+    0
+    <a href="/links/10/1">1</a>
+    <a href="/links/10/2">2</a>
+    <a href="/links/10/3">3</a>
+    <a href="/links/10/4">4</a>
+    <a href="/links/10/5">5</a>
+    <a href="/links/10/6">6</a>
+    <a href="/links/10/7">7</a>
+    <a href="/links/10/8">8</a>
+    <a href="/links/10/9">9</a>
+</body>
+</html>'''
+    
+    #---------------------------------------------------------------------------
+    def setUp(self):
+        self.data = utils.read_url('http://httpbin.org/links/10/0')
+    
+    #---------------------------------------------------------------------------
+    def test_select_attr(self):
+        h = HTML(self.data)
+        attrs = h.select_attr('a', 'href')
+        assert attrs._data == ['/links/10/{}'.format(i) for i in range(1,10)]
+
+    #---------------------------------------------------------------------------
+    def test_dumps(self):
+        h = HTML(self.data)
+        #pdb.set_trace()
+        assert unicode(h) == self.EXPECTED_HTML
+
+
 ################################################################################
 if __name__ == '__main__':
-    pdb.set_trace()
-    TestInstructions().test_instruction4()
+    unittest.main()

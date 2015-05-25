@@ -134,11 +134,13 @@ class BS4Formatter(HTMLFormatter):
     
     #---------------------------------------------------------------------------
     @classmethod
-    def format_element(cls, el, depth=0, prefix='    '):
+    def format_element(cls, el, lines, depth=0, prefix='    '):
         indent = prefix * depth
         if isinstance(el, bs4.NavigableString):
             el = el.strip()
-            return u'{}{}\n'.format(indent, el) if el else ''
+            if el:
+                lines.append(u'{}{}'.format(indent, el))
+            return lines
             
         tag = cls.get_tag(el)
         s = u'{}<{}'.format(indent, tag)
@@ -149,40 +151,47 @@ class BS4Formatter(HTMLFormatter):
         
         s += u'>'
         if tag in cls.NON_CLOSING:
-            return s + '\n'
+            lines.append(s)
+            return lines
 
         children = el.contents
         n_children = len(children)
         if children:
             if n_children > 1 or isinstance(children[0], bs4.Tag):
-                s += '\n'
+                lines.append(s)
                 for child in children:
                     child_tag = cls.get_tag(child)
-                    s += cls.format_element(
+                    lines = cls.format_element(
                         child,
+                        lines,
                         depth if child_tag in cls.NO_INDENT else depth + 1,
                         prefix
                     )
-                return s + u'{}</{}>\n'.format(indent, tag)
+                lines.append(u'{}</{}>'.format(indent, tag))
+                return lines
             else:
-                s += u'{}'.format(children[0].strip())
-        return s + u'</{}>\n'.format(tag)
+                lines.append(u'{}{}</{}>'.format(s, children[0].strip(), tag))
+        else:
+            lines.append(u'{}</{}>'.format(s, tag))
+        return lines
 
     #---------------------------------------------------------------------------
     @classmethod
     def format(cls, el, depth=0, prefix='    ', doctype=True):
-        st = ''
+        lines = []
         start = 0
         if isinstance(el, bs4.BeautifulSoup) and el.contents:
             first = el.contents[0]
             if isinstance(first, bs4.Doctype):
-                st += unicode(first.output_ready())
+                lines.append(unicode(first.output_ready()))
                 start = 1
 
         for child in el.contents[start:]:
-            st += cls.format_element(child, depth, prefix)
+            lines = cls.format_element(child, lines, depth, prefix)
 
-        return st
+        from pprint import pprint
+        pprint(lines)
+        return u'\n'.join(lines)
 
 #-------------------------------------------------------------------------------
 def bs4format(*args, **kws):
