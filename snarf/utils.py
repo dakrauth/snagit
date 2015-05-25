@@ -22,6 +22,9 @@ DEFAULT_DELIMITER = DEFAULT_RANGE_TOKEN = '@@@'
 
 #---------------------------------------------------------------------------
 def read_url(url, as_text=True):
+    '''
+    Read data from ``url``. Date can be plain text or bytes.
+    '''
     r = requests.get(url)
     return r.text if as_text else r.content
 
@@ -29,18 +32,27 @@ def read_url(url, as_text=True):
 #-------------------------------------------------------------------------------
 def is_string(obj):
     '''
-    Check if obj is a string
+    Check if ``obj`` is a string
     '''
     return isinstance(obj, basestring)
 
 
 #-------------------------------------------------------------------------------
 def is_regex(obj):
+    '''
+    Check if ``obj`` is a regular expression
+    
+    '''
     return hasattr(obj, 'pattern')
 
 
 #-------------------------------------------------------------------------------
 def seq(what):
+    '''
+    Make a ``list``-like sequence of ``what``.
+    
+    If ``what`` is a string or unicode, wrap it in a ``list``.
+    '''
     return [what] if is_string(what) else what
 
 
@@ -66,6 +78,10 @@ def verbose(fmt, *args):
 
 #-------------------------------------------------------------------------------
 def makedirs(pth):
+    '''
+    Friendly wrapper for ``os.makedirs``: instead of generating an exception
+    for existing ``path``, check first if it exists.
+    '''
     if not os.path.exists(pth):
         verbose('Creating directory {}', pth)
         os.makedirs(pth)
@@ -75,6 +91,9 @@ def makedirs(pth):
 
 #-------------------------------------------------------------------------------
 def absolute_filename(filename):
+    '''
+    Do all those annoying things to arrive at a real absolute path.
+    '''
     return os.path.abspath(
         os.path.expandvars(
             os.path.expanduser(filename)
@@ -84,6 +103,9 @@ def absolute_filename(filename):
 
 #-------------------------------------------------------------------------------
 def write_file(filename, data, mode='w', encoding='utf8'):
+    '''
+    Write ``data`` to properly encoded file.
+    '''
     filename = absolute_filename(filename)
     with codecs.open(filename, mode, encoding=encoding) as fp:
         fp.write(data)
@@ -91,6 +113,9 @@ def write_file(filename, data, mode='w', encoding='utf8'):
 
 #-------------------------------------------------------------------------------
 def read_file(filename, encoding='utf8'):
+    '''
+    Read ``data`` from properly encoded file.
+    '''
     filename = absolute_filename(filename)
     with codecs.open(filename, 'r', encoding=encoding) as fp:
         return fp.read()
@@ -98,12 +123,16 @@ def read_file(filename, encoding='utf8'):
 
 #-------------------------------------------------------------------------------
 def flatten(lists):
+    '''
+    Single-level conversion of things to an iterable.
+    '''
     return itertools.chain(*lists)
+
 
 range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
 
 #-------------------------------------------------------------------------------
-def get_range_run(start, end):
+def _get_range_run(start, end):
     if start.isdigit():
         fmt = '{}'
         if len(start) > 1 and start[0] == '0':
@@ -115,6 +144,11 @@ def get_range_run(start, end):
 
 #-------------------------------------------------------------------------------
 def get_range_set(text):
+    '''
+    Convert a string of range-like tokens into list of characters.
+    
+    For instance, ``'A-Z'`` becomes ``['A', 'B', ..., 'Z']``.
+    '''
     values = []
     while text:
         m = range_re.search(text)
@@ -129,14 +163,19 @@ def get_range_set(text):
         
         text = text[j:]
         start, end = m.group().split('-')
-        values.extend(get_range_run(start, end))
+        values.extend(_get_range_run(start, end))
 
     return values
 
 
 #===============================================================================
 class Loader(object):
+    '''
+    A cache loading manager to handle downloading bits from URLs and saving
+    them locally.
     
+    TODO: add feature to clear cache / force re-download.
+    '''
     #---------------------------------------------------------------------------
     def __init__(self, use_cache=False, **kws):
         self.cache_dir = None

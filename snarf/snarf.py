@@ -1,10 +1,9 @@
 # -*- coding:utf8 -*-
 import re
 import os
-import copy
 import json
 from pprint import pformat
-from collections import deque
+#import copy
 
 try:
     import bs4
@@ -21,10 +20,13 @@ verbose = utils.verbose
 #-------------------------------------------------------------------------------
 def replace(text, old, new, count=None, strip=False):
     '''
-    Replace a subset of ``text``.
+    Replace an ``old`` subset of ``text`` with ``new``.
     
-    ``old`` type may be either a string or regular expression
+    ``old`` type may be either a string or regular expression.
     
+    If ``strip``, remove all leading/trailing whitespace.
+    
+    If ``count``, replace the specified number of occurence, otherwise replace all.
     '''
     if is_string(old):
         text = text.replace(old, new, -1 if count is None else count)
@@ -39,12 +41,18 @@ def replace(text, old, new, count=None, strip=False):
 
 #-------------------------------------------------------------------------------
 def remove(text, what, count=None, strip=False):
+    '''
+    Like ``replace``, where ``new`` replacement is an empty string.
+    '''
     return replace(text, what, '', strip=strip)
-
 
 
 #-------------------------------------------------------------------------------
 def replace_each(text, items, count=None, strip=False):
+    '''
+    Like ``replace``, where each occurrence in ``items`` is a 2-tuple of 
+    ``(old, new)`` pair.
+    '''
     for a,b in utils.seq(items):
         text = replace(text, a, b, count=count, strip=strip)
     return text
@@ -52,14 +60,24 @@ def replace_each(text, items, count=None, strip=False):
 
 #-------------------------------------------------------------------------------
 def remove_each(text, items, count=None, strip=False):
+    '''
+    Like ``remove``, where each occurrence in ``items`` is ``what`` to remove.
+    '''
     for item in utils.seq(items):
         text = remove(text, item, count=count, strip=strip)
     return text
 
 
 #-------------------------------------------------------------------------------
-def splitter(text, tok, expected=2, default=None, strip=False):
-    bits = text.split(tok, expected - 1)
+def splitter(text, token, expected=2, default=None, strip=False):
+    '''
+    Split ``text`` by ``token`` into at least ``expected`` number of results.
+    
+    If actual number of results is less than ``expected``, pad with ``default``.
+    
+    If ``strip``, than do just that to each result.
+    '''
+    bits = text.split(token, expected - 1)
     if strip:
         bits = [s.strip() for s in bits]
     
@@ -73,6 +91,11 @@ def splitter(text, tok, expected=2, default=None, strip=False):
 
 #-------------------------------------------------------------------------------
 def matches(text, what):
+    '''
+    Check if ``what`` occurs in ``text``
+    
+    TODO: not sure if ``matches`` is appropriate, maybe ``contains``?
+    '''
     if is_string(what):
         return text.find(what) > -1
     elif callable(what):
@@ -82,6 +105,12 @@ def matches(text, what):
 
 #-------------------------------------------------------------------------------
 def beautiful_results(results):
+    '''
+    Convert a list of HTML elements back into a ``BeautifulSoup`` instance.
+    
+    For example, ``results`` would be the expected return from ``soup.select``
+    or ``soup.find_all``.
+    '''
     soup = bs4.BeautifulSoup()
     soup.contents = results
     return soup
@@ -173,7 +202,7 @@ class Bits(object):
 #===============================================================================
 class Text(Bits):
     '''
-    Text handler class for manipulating a block text.
+    Handler class for manipulating a block text.
     '''
     
     #---------------------------------------------------------------------------
@@ -193,7 +222,9 @@ class Text(Bits):
 
 #===============================================================================
 class HTML(Bits):
-
+    '''
+    Handler for manipulating a block of HTML. A wrapper for ``BeautifulSoup``.
+    '''
     BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
     
     #---------------------------------------------------------------------------
@@ -312,7 +343,7 @@ class HTML(Bits):
 #===============================================================================
 class Lines(Bits):
     '''
-    Convenience class for manipulating and traversing lines of text.
+    Handler class for manipulating and traversing lines of text.
     '''
     #---------------------------------------------------------------------------
     def __init__(self, data):
