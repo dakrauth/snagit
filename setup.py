@@ -31,7 +31,7 @@ setup(
         'Programming Language :: Python :: 2.7',
     ),
     packages=['snarf'],
-    install_requires=['request', 'beautifulsoup4'],
+    install_requires=['requests', 'beautifulsoup4'],
     entry_points = {
         'console_scripts': ['snarf = snarf.main:main']
     }
