@@ -63,7 +63,7 @@ def format(el, depth=0, prefix='    ', doctype=True):
     if isinstance(el, bs4.BeautifulSoup) and el.contents:
         first = el.contents[0]
         if isinstance(first, bs4.Doctype):
-            lines.append(unicode(first.output_ready()))
+            lines.append(unicode(first.output_ready()).strip())
             start = 1
 
     for child in el.contents[start:]:

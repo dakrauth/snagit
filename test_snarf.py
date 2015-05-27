@@ -1,7 +1,7 @@
 import re
 import sys
 import unittest
-from snarf.snarf import Lines, Text, HTML
+from snarf.snarf import Content, BeautifulSoup
 from snarf import script
 from snarf import utils
 try:
@@ -70,7 +70,7 @@ class TestLines(object):
 
     #---------------------------------------------------------------------------
     def test_simple(self):
-        lines = Lines(SOME_LINES)
+        lines = Content(SOME_LINES.splitlines())
         lines.compress()
         assert unicode(lines) == '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456'''
     
@@ -90,7 +90,7 @@ class TestInstructions(object):
     #---------------------------------------------------------------------------
     def _do_instruction(self, line, expect):
         cmd, args, kws = expect
-        prog = script.Program(line)
+        prog = script.Script(line)
         inst = prog.instructions[0]
 
         assert inst.cmd == cmd
@@ -170,13 +170,13 @@ class TestHTML(unittest.TestCase):
     
     #---------------------------------------------------------------------------
     def test_select_attr(self):
-        h = HTML(self.data)
-        attrs = h.select_attr('a', 'href')
-        assert attrs._data == ['/links/10/{}'.format(i) for i in range(1,10)]
+        h = Content(BeautifulSoup(self.data))
+        h.select_attr('a', 'href')
+        assert h.data == ['/links/10/{}'.format(i) for i in range(1,10)]
 
     #---------------------------------------------------------------------------
     def test_dumps(self):
-        h = HTML(self.data)
+        h = Content(BeautifulSoup(self.data))
         #pdb.set_trace()
         assert unicode(h) == self.EXPECTED_HTML
 

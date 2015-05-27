@@ -18,10 +18,10 @@ def parse_args(args=None):
         help='increase output verbosity')
     parser.add_argument('--pdb', action='store_true',
         help='use ipdb or pdb to debug')
+    parser.add_argument('--pm', action='store_true',
+        help='do post mortem for script exceptions')
     parser.add_argument('--range-set', dest='range_set',
         help='a range string to use for running sequences.')
-    parser.add_argument('--range-token', dest='range_token', default=utils.DEFAULT_RANGE_TOKEN,
-        help='token to be replaced in <source> strings when <range> is specified (default: @@@)')
     parser.add_argument('-s', '--script',
         help='script file to execute agains <source>')
     parser.add_argument('-o', '--output',
@@ -33,7 +33,7 @@ def parse_args(args=None):
 
 
 #-------------------------------------------------------------------------------
-def main(prog_args=None):
+def run_program(prog_args=None):
     args = parse_args(prog_args)
     start = datetime.now()
     if args.pdb:
@@ -45,11 +45,11 @@ def main(prog_args=None):
     if args.cache:
         loader.use_cache()
     
-    contents = loader.load(args.source, args.range_set, args.range_token)
+    contents = loader.load(args.source, args.range_set)
     
     if args.repl or args.script:
         code = utils.read_file(args.script) if args.script else ''
-        scr = script.Script(code, contents, loader)
+        scr = script.Program(code, contents, loader, do_pm=args.pm)
         if code:
             contents = scr.execute()
     
@@ -69,6 +69,11 @@ def main(prog_args=None):
     return contents
 
 
+#-------------------------------------------------------------------------------
+def main():
+    run_program(sys.argv[1:])
+
+
 ################################################################################
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()

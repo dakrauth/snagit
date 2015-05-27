@@ -3,18 +3,24 @@ import re
 import os
 import json
 from pprint import pformat
-#import copy
-
-try:
-    import bs4
-except ImportError:
-    bs4 = None
-
+from bs4 import BeautifulSoup, NavigableString
 from . import utils
 from . import markup
 
-is_string = utils.is_string
 verbose = utils.verbose
+is_string = utils.is_string
+
+BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
+
+
+#-------------------------------------------------------------------------------
+def is_lines(what):
+    return isinstance(what, (list, tuple))
+
+
+#-------------------------------------------------------------------------------
+def is_soup(what):
+    return isinstance(what, BeautifulSoup)
 
 
 #-------------------------------------------------------------------------------
@@ -104,6 +110,13 @@ def matches(text, what):
 
 
 #-------------------------------------------------------------------------------
+def find_first(data, what):
+    for i, line in enumerate(data):
+        if matches(line, what):
+            return i
+
+
+#-------------------------------------------------------------------------------
 def beautiful_results(results):
     '''
     Convert a list of HTML elements back into a ``BeautifulSoup`` instance.
@@ -111,92 +124,34 @@ def beautiful_results(results):
     For example, ``results`` would be the expected return from ``soup.select``
     or ``soup.find_all``.
     '''
-    soup = bs4.BeautifulSoup()
+    soup = BeautifulSoup()
     soup.contents = results
     return soup
 
 
 #===============================================================================
 class Bits(object):
-
-    #---------------------------------------------------------------------------
-    def __init__(self, data=''):
-        self._data = data
-        self._stack = []
-    
-    #---------------------------------------------------------------------------
-    def __str__(self):
-        return self._data
-    
-    __unicode__ = __str__
-    
-    #---------------------------------------------------------------------------
-    def __len__(self):
-        return len(self._data)
     
     #---------------------------------------------------------------------------
     def __iter__(self):
         return iter(self._data)
 
     #---------------------------------------------------------------------------
-    def _update(self, data):
-        self._stack.append(self._data)
-        self._data = data
+    def __len__(self):
+        return len(self._data)
+
+    #---------------------------------------------------------------------------
+    def serialize(self, format):
+        data = unicode(self._data)
+        return "'''{}'''".format(data) if format == 'python' else data
+
+    #---------------------------------------------------------------------------
+    def __str__(self):
+        return unicode(self)
     
     #---------------------------------------------------------------------------
-    def serialize(self, results, format='python', variable='data'):
-        if format == 'python':
-            if isinstance(results, (list, tuple)):
-                results = pformat(results)
-            else:
-                results = "'''{}'''".format(results)
-
-            return '{} = {}'.format(variable, results)
-        
-        elif format == 'json':
-            return json.dumps(results)
-            
-        raise ValueError('Unknown serialization format: {}'.format(format))
-    
-    #---------------------------------------------------------------------------
-    @property
-    def text(self):
-        return Text(unicode(self))
-
-    #---------------------------------------------------------------------------
-    @property
-    def lines(self):
-        return Lines(unicode(self))
-
-    #---------------------------------------------------------------------------
-    @property
-    def html(self):
-        return HTML(unicode(self))
-    
-    #---------------------------------------------------------------------------
-    def end(self):
-        self._data = self._stack.pop()
-        return self
-
-    #---------------------------------------------------------------------------
-    @classmethod
-    def combine(cls, contents):
-        if not contents:
-            return Bits()
-            
-        c = contents[0]
-        if isinstance(c, Lines):
-            lines = []
-            for li in contents:
-                lines.extend(li._data)
-            return Lines(lines)
-        elif isinstance(c, HTML):
-            soup = bs4.BeautifulSoup()
-            for doc in contents:
-                soup.contents.extend(doc.body())
-            return HTML(soup)
-        else:
-            return Text('\n'.join(item._data for item in contents))
+    def __getattr__(self, attr):
+        return getattr(self._data, attr)
 
 
 #===============================================================================
@@ -204,20 +159,17 @@ class Text(Bits):
     '''
     Handler class for manipulating a block text.
     '''
-    
+    #---------------------------------------------------------------------------
+    def __init__(self, data):
+        self._data = unicode(data)
+        
     #---------------------------------------------------------------------------
     def __iter__(self):
         return iter(self._data.splitlines())
-    
-    #---------------------------------------------------------------------------
-    def remove_each(self, items, **kws):
-        self._update(remove_each(self._data, items, **kws))
-        return self
         
     #---------------------------------------------------------------------------
-    def replace_each(self, items, **kws):
-        self._update(replace_each(self._data, items, **kws))
-        return self
+    def __unicode__(self):
+        return self._data
 
 
 #===============================================================================
@@ -225,43 +177,157 @@ class HTML(Bits):
     '''
     Handler for manipulating a block of HTML. A wrapper for ``BeautifulSoup``.
     '''
-    BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
     
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        if is_string(data):
-            data = bs4.BeautifulSoup(data)
-        super(HTML, self).__init__(data)
+        self._data = data if is_soup(data) else BeautifulSoup(unicode(data))
 
     #---------------------------------------------------------------------------
     def __unicode__(self):
         return markup.bs4format(self._data)
     
-    __str__ = __unicode__
+    #---------------------------------------------------------------------------
+    def serialize(self, format):
+        results = []
+        for item in self._data.findChildren(recursive=False):
+            values = []
+            results.append(values)
+            for content in item.contents:
+                if isinstance(content, NavigableString):
+                    content = content.strip()
+                    if content:
+                        values.append(content)
+                else:
+                    content = content.string
+                    values.append(content.strip() if content else '')
+
+        return pformat(results)
+
+#===============================================================================
+class Lines(Bits):
+    '''
+    Handler class for manipulating and traversing lines of text.
+    '''
+    #---------------------------------------------------------------------------
+    def __init__(self, data):
+        self._data = data[:] if is_lines(data) else unicode(data).splitlines()
+
+    #---------------------------------------------------------------------------
+    def __unicode__(self):
+        return u'\n'.join(self._data)
+
+    #---------------------------------------------------------------------------
+    def serialize(self, format):
+        return pformat(self._data)
+
+
+#===============================================================================
+class Content(object):
+
+    #---------------------------------------------------------------------------
+    def __init__(self, data=''):
+        self._stack = []
+        self._data = self._handler(data)
+
+    #---------------------------------------------------------------------------
+    def _handler(self, data):
+        if is_lines(data):
+            return Lines(data)
+        elif is_soup(data):
+            return HTML(data)
+        elif is_string(data):
+            return Text(data)
+        else:
+            raise ValueError('Cannot handle data type, must be string or list')
+    
+    #---------------------------------------------------------------------------
+    def __unicode__(self):
+        return unicode(self._data)
+    
+    #---------------------------------------------------------------------------
+    def __iter__(self):
+        return iter(self._data)
+
+    #---------------------------------------------------------------------------
+    @property
+    def data(self):
+        return self._data._data
+    
+    #---------------------------------------------------------------------------
+    def _update(self, data):
+        self._stack.append(self._data)
+        self._data = self._handler(data)
     
     #---------------------------------------------------------------------------
     @property
+    def text(self):
+        return unicode(self._data)
+
+    #---------------------------------------------------------------------------
+    @property
+    def lines(self):
+        return unicode(self._data).splitlines()
+
+    #---------------------------------------------------------------------------
+    @property
     def soup(self):
-        return bs4.BeautifulSoup(unicode(self._data))
-        #return copy.deepcopy(self._data)
-    
+        return BeautifulSoup(unicode(self._data))
+
+    #---------------------------------------------------------------------------
+    def end(self):
+        self._data = self._stack.pop()
+
+    #---------------------------------------------------------------------------
+    @classmethod
+    def combine(cls, contents):
+        '''
+        Distill contents into a single piece of content.
+        '''
+        if not contents:
+            return Content('')
+            
+        c = contents[0]._data
+        if isinstance(c, Lines):
+            lines = []
+            for li in contents:
+                lines.extend(li._data)
+            return Content(lines)
+        elif isinstance(c, HTML):
+            soup = BeautifulSoup()
+            for doc in contents:
+                soup.contents.extend(doc.body())
+            return Content(soup)
+        else:
+            return Content('\n'.join(item._data for item in contents))
+            
+    #---------------------------------------------------------------------------
+    def remove_each(self, items, **kws):
+        self._update(remove_each(self.text, items, **kws))
+        
+    #---------------------------------------------------------------------------
+    def replace_each(self, items, **kws):
+        self._update(replace_each(self.text, items, **kws))
+        
     #---------------------------------------------------------------------------
     def _call_cmd(self, cmd, args):
         if is_string(args):
             args = args.split(',')
         
         soup = self.soup
-        for arg in args:
-            for el in soup.select(arg):
+        for item in args:
+            for el in soup.select(item):
                 method = getattr(el, cmd)
                 method()
                 
         self._update(soup)
-        return self
     
     #---------------------------------------------------------------------------
     def unwrap(self, tags):
-        return self._call_cmd('unwrap', tags)
+        self._call_cmd('unwrap', tags)
+
+    #---------------------------------------------------------------------------
+    def extract(self, tags):
+        self._call_cmd('extract', tags)
     
     #---------------------------------------------------------------------------
     def replace_with(self, query, what):
@@ -270,20 +336,13 @@ class HTML(Bits):
             el.replace_with(what)
         
         self._update(soup)
-        return self
         
-    #---------------------------------------------------------------------------
-    def extract(self, tags):
-        return self._call_cmd('extract', tags)
-    
     #---------------------------------------------------------------------------
     def select(self, query):
         results = self._data.select(query)
         verbose('Selected {} matches', len(results))
         if results:
             self._update(beautiful_results(results))
-
-        return self
 
     #---------------------------------------------------------------------------
     def select_attr(self, query, attr, test=bool):
@@ -294,14 +353,14 @@ class HTML(Bits):
                 if test(value):
                     results.append(value)
 
-        return Lines(results)
+        self._update(results)
 
     #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
         if is_string(attrs):
             attrs = attrs if attrs == '*' else attrs.split(',')
 
-        attrs = attrs or HTML.BAD_ATTRS
+        attrs = attrs or BAD_ATTRS
         soup = self.soup
         for el in soup.descendants:
             if hasattr(el, 'attrs'):
@@ -311,24 +370,17 @@ class HTML(Bits):
                     el.attrs = dict([(k, v) for k,v in el.attrs.items() if k not in attrs])
         
         self._update(soup)
-        return self
 
     #---------------------------------------------------------------------------
-    def serialize(self, query): # query):
-        results = []
-        for item in self._data.select(query):
-            values = []
-            results.append(values)
-            for content in item.contents:
-                if isinstance(content, bs4.NavigableString):
-                    content = content.strip()
-                    if content:
-                        values.append(content)
-                else:
-                    content = content.string
-                    values.append(content.strip() if content else '')
-        
-        return super(HTML, self).serialize(results)
+    def serialize(self, format='python', variable='data'):
+        if format == 'python':
+            text = '{} = {}'.format(variable, self._data.serialize(format))
+        elif format == 'json':
+            text = json.dumps(self._data.serialize(format))
+        else:
+            raise ValueError('Unknown serialization format: {}'.format(format))
+            
+        self._update(text)
 
     #---------------------------------------------------------------------------
     def collapse(self, query, joiner=' '):
@@ -337,68 +389,39 @@ class HTML(Bits):
             item.string = joiner.join([s.strip() for s in item.text.split()])
             
         self._update(soup)
-        return self
 
-
-#===============================================================================
-class Lines(Bits):
-    '''
-    Handler class for manipulating and traversing lines of text.
-    '''
-    #---------------------------------------------------------------------------
-    def __init__(self, data):
-        if is_string(data):
-            data = data.splitlines()
-        super(Lines, self).__init__(data)
-
-    #---------------------------------------------------------------------------
-    def _find_first(self, what):
-        for i, line in enumerate(self._data):
-            if matches(line, what):
-                return i
-        
-    #---------------------------------------------------------------------------
-    def __str__(self):
-        return u'\n'.join(self._data)
-    
-    __unicode__ = __str__
-    
     #---------------------------------------------------------------------------
     def format(self, fmt):
-        self._update([fmt.format(l) for l in self._data])
-        return self
+        self._update([fmt.format(l) for l in self.lines])
     
     #---------------------------------------------------------------------------
     def compress(self):
-        self._update([' '.join(l.strip().split()) for l in self._data])
-        return self
+        self._update([' '.join(l.strip().split()) for l in self.lines])
     
     #---------------------------------------------------------------------------
     def strip(self):
-        self._update([l.strip() for l in self._data])
-        return self
+        self._update([l.strip() for l in self.lines])
         
     #---------------------------------------------------------------------------
     def skip_to(self, what, keep=True):
-        found = self._find_first(what)
+        lines = self.lines
+        found = find_first(lines, what)
         if found is not None:
             if not keep:
                 found += 1
-            self._update(self._data[found:])
-        
-        return self
+            
+            self._update(lines[found:])
         
     #----------------------------------------------------------------------------
     def read_until(self, what, keep=True):
-        found = self._find_first(what)
+        lines = self.lines
+        found = find_first(lines, what)
         if found is not None:
             if keep:
                 found += 1
-            self._update(self._data[:found])
-        
-        return self
+            
+            self._update(lines[:found])
         
     #---------------------------------------------------------------------------
     def matches(self, what):
-        self._update([l for l in self._data if matches(l, what)])
-        return self
+        self._update([l for l in self.lines if matches(l, what)])

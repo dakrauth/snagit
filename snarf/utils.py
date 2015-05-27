@@ -17,7 +17,7 @@ except ImportError:
 
 logger = logging.getLogger('snarf')
 
-DEFAULT_DELIMITER = DEFAULT_RANGE_TOKEN = '@@@'
+DEFAULT_DELIMITER = '@@@'
 
 
 #---------------------------------------------------------------------------
@@ -223,12 +223,12 @@ class Loader(object):
         return dirname, os.path.join(dirname, pth)
         
     #---------------------------------------------------------------------------
-    def load(self, sources, range_set=None, token=DEFAULT_RANGE_TOKEN):
+    def load(self, sources, range_set=None):
         if is_string(sources):
             sources = [sources]
         
         if range_set:
-            sources = self.normalize(sources, range_set, token=token)
+            sources = self.normalize(sources, range_set)
         
         contents = []
         for src in sources:
@@ -262,11 +262,11 @@ class Loader(object):
         return contents
 
     #---------------------------------------------------------------------------
-    def normalize(self, sources, range_set, token=DEFAULT_RANGE_TOKEN):
+    def normalize(self, sources, range_set):
         results = []
         chars = get_range_set(range_set)
         for source in sources:
-            results.extend([source.replace(token, c) for c in chars])
+            results.extend([source.replace('{}', c) for c in chars])
         
         return results
 
