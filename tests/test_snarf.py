@@ -10,52 +10,6 @@ except ImportError:
     import pdb
 
 
-SOME_HTML = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title></title>
-    <meta name="description" content="">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="" rel="stylesheet" media="all">
-    <script src=""></script>
-</head>
-<body>
-    <header role="banner">
-        <h1></h1>
-        <nav role="navigation"></nav>
-    </header>
-    <div class="wrap">
-        <main role="main" style="li { color: red; }">
-            <ul>
-                <li class="abc"><a href="/abc/foo1">line 1</a></li>
-                <li class="abc"><a href="/abc/foo2">line 2</a></li>
-                <li class="efg"><a href="/xyz/foo3">line 3</a></li>
-                <li class="efg"><a href="/xyz/foo4">line 4</a></li>
-                <li class="abc efg">line 5</li>
-                <li class="xyz">line 6</li>
-            </ul>
-        </main>
-    </div>
-    <footer role="contentinfo">
-        <small>Copyright &copy; <time datetime="2014">2014</time></small>
-    </footer>
-    <script>
-        (function() {
-
-        }());
-    </script>
-</body>
-</html>'''
-
-SOME_LINES = '''foo bar baz
-spam     
-xxxxxxxx
-zzzz
-   \t   123
-   u6ejtryn
-456'''
-
 R = re.compile
 
 #-------------------------------------------------------------------------------
@@ -70,7 +24,8 @@ class TestLines(object):
 
     #---------------------------------------------------------------------------
     def test_simple(self):
-        lines = Content(SOME_LINES.splitlines())
+        data = utils.read_file('tests/data/lines.txt')
+        lines = Content(data.splitlines())
         lines.compress()
         assert unicode(lines) == '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456'''
     
@@ -172,7 +127,7 @@ class TestHTML(unittest.TestCase):
     def test_select_attr(self):
         h = Content(BeautifulSoup(self.data))
         h.select_attr('a', 'href')
-        assert h.data == ['/links/10/{}'.format(i) for i in range(1,10)]
+        assert h.lines == ['/links/10/{}'.format(i) for i in range(1,10)]
 
     #---------------------------------------------------------------------------
     def test_dumps(self):

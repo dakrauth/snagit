@@ -2,10 +2,10 @@ init:
 	pip install -r requirements.txt
 
 test:
-	py.test test_snarf.py
+	py.test tests
 
 unittest:
-	python -m unittest test_snarf
+	python -m unittest discover -s tests
 
 develop:
 	pip install -e .

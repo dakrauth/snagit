@@ -249,11 +249,6 @@ class Content(object):
         return iter(self._data)
 
     #---------------------------------------------------------------------------
-    @property
-    def data(self):
-        return self._data._data
-    
-    #---------------------------------------------------------------------------
     def _update(self, data):
         self._stack.append(self._data)
         self._data = self._handler(data)
