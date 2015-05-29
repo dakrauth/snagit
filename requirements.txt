@@ -2,3 +2,4 @@ beautifulsoup4
 requests
 pytest
 pytest-cov
+strutil

@@ -2,16 +2,16 @@ import bs4
 
 BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
 NON_CLOSING = 'hr br link meta img base input param source'.split()
-NO_INDENT = 'body head tbody thead tfoot'.split()
+NO_INDENT = 'body head tr'.split()
 
 
 #-------------------------------------------------------------------------------
 def get_attrs(el):
-    attrs = {}
     orig = getattr(el, 'attrs', {}) or {}
-    for key, values in orig.items():
-        attrs[key] = ' '.join(values) if isinstance(values, (list, tuple)) else values
-    return attrs
+    return {
+        key: ' '.join(values) if isinstance(values, (list, tuple)) else values
+        for key, values in orig.items()
+    }
 
 
 #-------------------------------------------------------------------------------
@@ -23,36 +23,28 @@ def format_element(el, lines, depth=0, prefix='    '):
             lines.append(u'{}{}'.format(indent, el))
         return lines
         
-    tag = el.name
-    s = u'{}<{}'.format(indent, tag)
     
-    attrs = get_attrs(el)
-    for k, v in attrs.items():
-        s += u' {}="{}"'.format(k, v)
+    line = u'{}<{}'.format(indent, el.name)
+    for k, v in get_attrs(el).items():
+        line += u' {}="{}"'.format(k, v)
     
-    s += u'>'
-    if tag in NON_CLOSING:
-        lines.append(s)
+    line += u'>'
+    if el.name in NON_CLOSING:
+        lines.append(line)
         return lines
 
-    children = el.contents
-    n_children = len(children)
-    if children:
-        if n_children > 1 or isinstance(children[0], bs4.Tag):
-            lines.append(s)
-            for child in children:
-                lines = format_element(
-                    child,
-                    lines,
-                    depth if child.name in NO_INDENT else depth + 1,
-                    prefix
-                )
-            lines.append(u'{}</{}>'.format(indent, tag))
-            return lines
+    n_children = len(el.contents)
+    if n_children:
+        if n_children > 1 or isinstance(el.contents[0], bs4.Tag):
+            lines.append(line)
+            for ct in el.contents:
+                ct_depth = depth if ct.name in NO_INDENT else depth + 1
+                lines = format_element(ct, lines, ct_depth, prefix)
+            lines.append(u'{}</{}>'.format(indent, el.name))
         else:
-            lines.append(u'{}{}</{}>'.format(s, children[0].strip(), tag))
+            lines.append(u'{}{}</{}>'.format(line, el.contents[0].strip(), el.name))
     else:
-        lines.append(u'{}</{}>'.format(s, tag))
+        lines.append(u'{}</{}>'.format(line, el.name))
     
     return lines
 
@@ -71,6 +63,3 @@ def format(el, depth=0, prefix='    ', doctype=True):
 
     # from pprint import pprint; pprint(lines)
     return u'\n'.join(lines)
-
-
-bs4format = format

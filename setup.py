@@ -6,7 +6,7 @@ if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit(0)
 
-with open('README.md', 'r') as f:
+with open('README.rst', 'r') as f:
     long_description = f.read()
 
 # Dynamically calculate the version based on swingtime.VERSION.
@@ -31,7 +31,7 @@ setup(
         'Programming Language :: Python :: 2.7',
     ),
     packages=['snarf'],
-    install_requires=['requests', 'beautifulsoup4'],
+    install_requires=['requests', 'beautifulsoup4', 'strutil'],
     entry_points = {
         'console_scripts': ['snarf = snarf.main:main']
     }

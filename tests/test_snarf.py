@@ -1,4 +1,5 @@
 import re
+from os.path import join, dirname
 import sys
 import unittest
 from snarf.snarf import Content, BeautifulSoup
@@ -11,6 +12,11 @@ except ImportError:
 
 
 R = re.compile
+#-------------------------------------------------------------------------------
+
+def read_data(basename):
+    return utils.read_file(join(dirname(__file__), 'data', basename))
+
 
 #-------------------------------------------------------------------------------
 def display(what):
@@ -24,7 +30,7 @@ class TestLines(object):
 
     #---------------------------------------------------------------------------
     def test_simple(self):
-        data = utils.read_file('tests/data/lines.txt')
+        data = read_data('lines.txt')
         lines = Content(data.splitlines())
         lines.compress()
         assert unicode(lines) == '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456'''

@@ -3,7 +3,7 @@ import re
 import os, sys
 import argparse
 from datetime import datetime
-from . import snarf, utils, script
+from . import utils, script
 
 verbose = utils.verbose
 

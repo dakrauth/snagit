@@ -6,6 +6,7 @@ import inspect
 import functools
 import traceback
 from pprint import pformat
+import strutil
 from . import utils
 from . import snarf
 
@@ -58,14 +59,8 @@ class Instruction(object):
     
     #---------------------------------------------------------------------------
     def __init__(self, program, line, lineno):
-        self.args = []
-        self.kws = {}
         self.lineno = lineno
-        
-        bits = line.split(' ', 1)
-        self.cmd = bits[0]
-        if len(bits) > 1:
-            self.parse(bits[1])
+        self.parse(line)
         
     #----------------------------------------------------------------------------
     def get_value(self, s):
@@ -82,6 +77,16 @@ class Instruction(object):
 
     #---------------------------------------------------------------------------
     def parse(self, text):
+        self.args = []
+        self.kws = {}
+        self.cmd, text = strutil.splitter(text, expected=2, strip=True)
+        
+        if self.cmd.lower().startswith(('http://', 'https://')):
+            self.cmd, text = 'load', self.cmd
+            
+        if not text:
+            return
+        
         while text:
             m = self.args_re.search(text)
             if not m:
@@ -178,7 +183,6 @@ def register_handler(kind):
     '''
     def decorator(method):
         method.kind = kind
-        method.takes_content = 'content' in inspect.getargspec(method).args
         return method
     return decorator
 
@@ -189,57 +193,12 @@ line_handler = register_handler('Lines')
 
 
 #===============================================================================
-class Contents(object):
-    
-    #---------------------------------------------------------------------------
-    def __init__(self, contents=None):
-        self.set(contents)
-    
-    #---------------------------------------------------------------------------
-    def __iter__(self):
-        return iter(self.contents)
-    
-    #---------------------------------------------------------------------------
-    def __len__(self):
-        return len(self.contents)
-    
-    #---------------------------------------------------------------------------
-    def __unicode__(self):
-        return '\n'.join([unicode(c) for c in self])
-    
-    #---------------------------------------------------------------------------
-    def __getitem__(self, index):
-        return self.contents[index]
-    
-    #---------------------------------------------------------------------------
-    def end(self):
-        for content in self:
-            content.end()
-        
-    #---------------------------------------------------------------------------
-    def set(self, contents):
-        self.contents = []
-        if contents:
-            if utils.is_string(contents):
-                contents = [contents]
-            
-            for content in contents:
-                if not isinstance(content, snarf.Content):
-                    if utils.is_string(content):
-                        c = content.strip()
-                        if c.startswith('<') and c.endswith('>'):
-                            content = snarf.BeautifulSoup(content)
-                    
-                self.contents.append(snarf.Content(content))
-
-
-#===============================================================================
 class Program(object):
     
     #---------------------------------------------------------------------------
     def __init__(self, code='', contents=None, loader=None, use_cache=False, do_pm=False):
         self.loader = loader if loader else utils.Loader(use_cache)
-        self.contents = Contents(contents)
+        self.contents = snarf.Contents(contents)
         self.do_break = False
         self.do_pm = do_pm
         self.script = Script(code)
@@ -261,11 +220,12 @@ class Program(object):
             if not line:
                 continue
             
-            if line.startswith('!'):
-                line = line[1:].strip()
-                set_trace()
             if line.startswith('?'):
                 line = 'help ' + line[1:]
+
+            if line.startswith('!'):
+                self.do_break = True
+                line = line[1:].strip()
                 
             instrs = self.script.compile(line)
             try:
@@ -282,8 +242,8 @@ class Program(object):
             if s.startswith('cmd_'):
                 cmd = s[4:]
                 if subset is None or '*' in subset or cmd in subset:
-                    cmds.append((cmd, s, getattr(self, s)))
-
+                    m = getattr(self, s)
+                    cmds.append((cmd, s, m, getattr(m, 'kind', None), get_doc(m)))
         return cmds
     
     #---------------------------------------------------------------------------
@@ -300,11 +260,7 @@ class Program(object):
         error = None
         try:
             if do_break: set_trace()
-            if getattr(method, 'takes_content', False):
-                for content in self.contents:
-                     method(content, instr.args, instr.kws)
-            else:
-                method(instr.args, instr.kws)
+            method(instr.args, instr.kws)
         except:
             exc, value, tb = sys.exc_info()
             if self.do_pm:
@@ -335,15 +291,16 @@ class Program(object):
         '''
         Display help on available commands.
         '''
+        cmds = self._get_commands()
+        fmt = ' - ({})'.format
         if not args:
             print 'Commands:'
-            print '\n'.join(['    ' + s[0] for s in self._get_commands()])
+            print '\n'.join(['    {}{}'.format(s,fmt(k) if k else '') for s,n,m,k,d in cmds])
         else:
-            cmds = self._get_commands(args)
-            for cmd, method_name, method in cmds:
-                docstr = get_doc(method)
-                if getattr(method, 'takes_content', False):
-                    cmd += ' - ({} content)'.format(method.kind)
+            for cmd, method_name, method, kind, docstr in cmds:
+                if kind:
+                    cmd += fmt(kind)
+
                 print cmd
                 if docstr:
                     print docstr
@@ -407,8 +364,7 @@ class Program(object):
         '''
         Dumps the text representation of all content to the specified file.
         '''
-        data = '\n'.join([unicode(c) for c in self.contents])
-        utils.write_file(args[0], data)
+        utils.write_file(args[0], unicode(self.contents))
 
     #---------------------------------------------------------------------------
     def cmd_dumps(self, args, kws):
@@ -427,51 +383,51 @@ class Program(object):
 
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_skip_to(self, content, args, kws):
+    def cmd_skip_to(self, args, kws):
         '''
         Skip lines until finding a matching line.
         '''
-        content.skip_to(args[0], **kws)
+        self.contents.skip_to(args[0], **kws)
     
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_read_until(self, content, args, kws):
+    def cmd_read_until(self, args, kws):
         '''
         Save lines until finding a matching line.
         '''
-        content.read_until(args[0], **kws)
+        self.contents.read_until(args[0], **kws)
 
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_strip(self, content, args, kws):
+    def cmd_strip(self, args, kws):
         '''
         Strip whitespace from content.
         '''
-        content.strip()
+        self.contents.strip()
     
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_matches(self, content, args, kws):
+    def cmd_matches(self, args, kws):
         '''
         Save lines matching the input.
         '''
-        content.matches(args[0], **kws)
+        self.contents.matches(args[0], **kws)
     
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_compress(self, content, args, kws):
+    def cmd_compress(self, args, kws):
         '''
         Strip, split, and rejoin each line using a single space.
         '''
-        content.compress()
+        self.contents.compress()
 
     #---------------------------------------------------------------------------
     @line_handler
-    def cmd_format(self, content, args, kws):
+    def cmd_format(self, args, kws):
         '''
         Format each line, where the current line is passed using {}.
         '''
-        content.format(args[0])
+        self.contents.format(args[0])
     
     #---------------------------------------------------------------------------
     # Text methods
@@ -479,22 +435,22 @@ class Program(object):
 
     #---------------------------------------------------------------------------
     @text_handler
-    def cmd_remove(self, content, args, kws):
+    def cmd_remove(self, args, kws):
         '''
         Remove each string argument from the text.
         '''
-        content.remove_each(args, **kws)
+        self.contents.remove_each(args, **kws)
     
     #---------------------------------------------------------------------------
     @text_handler
-    def cmd_replace(self, content, args, kws):
+    def cmd_replace(self, args, kws):
         '''
         Replace each string argument with the last given argument as the replacement.
         '''
         args = args[:]
         replacement = args.pop()
         args = [(a, replacement) for a in args]
-        content.replace_each(args, **kws)
+        self.contents.replace_each(args, **kws)
     
     #---------------------------------------------------------------------------
     # HTML methods
@@ -502,62 +458,67 @@ class Program(object):
 
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_remove_attrs(self, text, args, kws):
+    def cmd_remove_attrs(self, args, kws):
         '''
         Removes the specified attributes from all elements.
         '''
-        text.remove_attrs(args[0] if args else None, **kws)
+        self.contents.remove_attrs(args[0] if args else None, **kws)
     
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_unwrap(self, content, args, kws):
+    def cmd_unwrap(self, args, kws):
         '''
         Replace an element with its child contents.
         '''
-        for tag in args:
-            content.unwrap(tag, **kws)
-
+        self.contents.unwrap(args, **kws)
+    
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_extract(self, content, args, kws):
+    def cmd_unwrap_attr(self, args, kws):
+        '''
+        Replace an element with the content for a specified attribute.
+        '''
+        self.contents.unwrap_attr(args[0], args[1])
+    
+    #---------------------------------------------------------------------------
+    @html_handler
+    def cmd_extract(self, args, kws):
         '''
         Removes the specified elements.
         '''
-        for tag in args:
-            content.extract(tag, **kws)
+        self.contents.extract(args, **kws)
     
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_select(self, content, args, kws):
+    def cmd_select(self, args, kws):
         '''
         Whittle down elements to those matching the CSS selection.
         '''
-        content.select(args[0])
+        self.contents.select(args[0])
 
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_select_attr(self, content, args, kws):
+    def cmd_select_attr(self, args, kws):
         '''
         Using the given CSS selector, pull out the specified attribute text into Lines.
         '''
-        content.select_attr(args[0], args[1])
+        self.contents.select_attr(args[0], args[1])
         
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_replace_tag(self, content, args, kws):
+    def cmd_replace_tag(self, args, kws):
         '''
         Replace the specified tag with some plain text.
         '''
-        content.replace_with(args[0], args[1])
+        self.contents.replace_with(args[0], args[1])
     
     #---------------------------------------------------------------------------
     @html_handler
-    def cmd_collapse(self, content, args, kws):
+    def cmd_collapse(self, args, kws):
         '''
         Given a CSS selector, combine multiple whitespace chars into a single space and trim.
         '''
-        for arg in args:
-            content.collapse(arg, **kws)
+        self.contents.collapse(args, **kws)
 
 
 #-------------------------------------------------------------------------------

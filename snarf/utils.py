@@ -4,7 +4,7 @@ import codecs
 import logging
 import itertools
 from urlparse import urlparse, ParseResult
-
+from strutil import is_string, is_regex
 try:
     import requests
 except ImportError:
@@ -27,23 +27,6 @@ def read_url(url, as_text=True):
     '''
     r = requests.get(url)
     return r.text if as_text else r.content
-
-
-#-------------------------------------------------------------------------------
-def is_string(obj):
-    '''
-    Check if ``obj`` is a string
-    '''
-    return isinstance(obj, basestring)
-
-
-#-------------------------------------------------------------------------------
-def is_regex(obj):
-    '''
-    Check if ``obj`` is a regular expression
-    
-    '''
-    return hasattr(obj, 'pattern')
 
 
 #-------------------------------------------------------------------------------
