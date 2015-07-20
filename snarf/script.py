@@ -9,6 +9,7 @@ from pprint import pformat
 import strutil
 from . import utils
 from . import snarf
+from .loader import Loader
 
 verbose = utils.verbose
 set_trace = utils.pdb.set_trace
@@ -197,7 +198,7 @@ class Program(object):
     
     #---------------------------------------------------------------------------
     def __init__(self, code='', contents=None, loader=None, use_cache=False, do_pm=False):
-        self.loader = loader if loader else utils.Loader(use_cache)
+        self.loader = loader if loader else Loader(use_cache)
         self.contents = snarf.Contents(contents)
         self.do_break = False
         self.do_pm = do_pm
@@ -310,8 +311,7 @@ class Program(object):
         '''
         Combine all contents into a single content.
         '''
-        if len(self.contents) > 1:
-            self.contents.set(snarf.Content.combine(self.contents))
+        self.contents.combine()
     
     #---------------------------------------------------------------------------
     def cmd_serialize(self, args, kws):
@@ -334,7 +334,7 @@ class Program(object):
         '''
         Load new resource(s).
         '''
-        contents = self.loader.load(args, **kws)
+        contents = self.loader.load_sources(args, **kws)
         self.contents.set(contents)
     
     #---------------------------------------------------------------------------

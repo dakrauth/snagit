@@ -1,10 +1,12 @@
 import re
 import os
+import atexit
 import codecs
+import random
 import logging
 import itertools
-from urlparse import urlparse, ParseResult
 from strutil import is_string, is_regex
+
 try:
     import requests
 except ImportError:
@@ -15,17 +17,23 @@ try:
 except ImportError:
     import pdb
 
-logger = logging.getLogger('snarf')
-
 DEFAULT_DELIMITER = '@@@'
+USER_AGENTS = (
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
+    'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:22.0) Gecko/20100 101 Firefox/22.0',
+    'Mozilla/5.0 (Windows NT 6.1; rv:11.0) Gecko/20100101 Firefox/11.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
+    'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
+)
 
+logger = logging.getLogger('snarf')
 
 #---------------------------------------------------------------------------
 def read_url(url, as_text=True):
     '''
     Read data from ``url``. Date can be plain text or bytes.
     '''
-    r = requests.get(url)
+    r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)})
     return r.text if as_text else r.content
 
 
@@ -57,19 +65,6 @@ def configure_logger(debug=False):
 #-------------------------------------------------------------------------------
 def verbose(fmt, *args):
     logger.debug(fmt.format(*args))
-
-
-#-------------------------------------------------------------------------------
-def makedirs(pth):
-    '''
-    Friendly wrapper for ``os.makedirs``: instead of generating an exception
-    for existing ``path``, check first if it exists.
-    '''
-    if not os.path.exists(pth):
-        verbose('Creating directory {}', pth)
-        os.makedirs(pth)
-        return True
-    return False
 
 
 #-------------------------------------------------------------------------------
@@ -151,105 +146,13 @@ def get_range_set(text):
     return values
 
 
-#===============================================================================
-class Loader(object):
-    '''
-    A cache loading manager to handle downloading bits from URLs and saving
-    them locally.
+#-------------------------------------------------------------------------------
+def expand_range_set(sources, range_set):
+    results = []
+    chars = get_range_set(range_set)
+    for src in sources:
+        results.extend([src.replace('{}', c) for c in chars])
     
-    TODO: add feature to clear cache / force re-download.
-    '''
-    #---------------------------------------------------------------------------
-    def __init__(self, use_cache=False, **kws):
-        self.cache_dir = None
-        if use_cache:
-            self.use_cache(**kws)
-    
-    #---------------------------------------------------------------------------
-    @staticmethod
-    def load_history(base_dir='~', snarf_dir='.snarf', filename='history'):
-        try:
-            import readline, atexit
-        except ImportError:
-            return
-        
-        parent_dir = os.path.join(absolute_filename(base_dir), snarf_dir)
-        makedirs(parent_dir)
-        histfile = os.path.join(parent_dir, filename)
-        
-        try:
-            readline.read_history_file(histfile)
-        except IOError:
-            pass
-        
-        atexit.register(readline.write_history_file, histfile)
-        
-    #---------------------------------------------------------------------------
-    def use_cache(self, base_dir='~', snarf_dir='.snarf', cache_dir='cache'):
-        self.cache_dir = os.path.join(absolute_filename(base_dir), snarf_dir, cache_dir)
-        if not makedirs(self.cache_dir):
-            verbose('Using cache directory {}', self.cache_dir)
-        
-    #---------------------------------------------------------------------------
-    def url_to_cache_filename(self, urlp):
-        urlp = urlparse(urlp) if not isinstance(urlp, ParseResult) else urlp
-        if urlp.path:
-            pth = urlp.path[1:]
-        else:
-            pth = 'index.html'
-        
-        pth = '__'.join([s for s in pth.split('/') if s])
-        if not pth.endswith(('.html', '.htm')):
-            pth += '.html'
-        
-        dirname = os.path.join(self.cache_dir, urlp.netloc)
-        return dirname, os.path.join(dirname, pth)
-        
-    #---------------------------------------------------------------------------
-    def load(self, sources, range_set=None):
-        if is_string(sources):
-            sources = [sources]
-        
-        if range_set:
-            sources = self.normalize(sources, range_set)
-        
-        contents = []
-        for src in sources:
-            verbose('Loading {}', src)
-            urlp = urlparse(src)
-            data = None
-            if urlp.scheme in ('file', ''):
-                verbose('Reading from file: {}', urlp.path)
-                data = read_file(urlp.path)
-        
-            elif self.cache_dir:
-                dirname, src_munge = self.url_to_cache_filename(urlp)
-                if os.path.exists(src_munge):
-                    verbose('Reading from cache file: {}', src_munge)
-                    data = read_file(src_munge)
-                    __, data = data.split('\n', 1)
+    return results
 
-            if data is None:
-                data = read_url(src)
-                verbose('Retrieved {} bytes from {}', len(data), src)
-                if self.cache_dir:
-                    verbose('Caching to {}', src_munge)
-                    if not os.path.exists(dirname):
-                        os.makedirs(dirname)
-                
-                    write_file(src_munge, u'<!-- From: {} -->\n{}'.format(src, data))
-                
-            verbose('Loaded {} bytes', len(data))
-            contents.append(data)
-            
-        return contents
-
-    #---------------------------------------------------------------------------
-    def normalize(self, sources, range_set):
-        results = []
-        chars = get_range_set(range_set)
-        for source in sources:
-            results.extend([source.replace('{}', c) for c in chars])
-        
-        return results
 

@@ -4,7 +4,7 @@ import os, sys
 import argparse
 from datetime import datetime
 from . import utils, script
-
+from .loader import Loader
 verbose = utils.verbose
 
 
@@ -41,11 +41,11 @@ def run_program(prog_args=None):
         
     utils.configure_logger(args.verbose)
     verbose('{}', args)
-    loader = utils.Loader()
+    loader = Loader()
     if args.cache:
         loader.use_cache()
     
-    contents = loader.load(args.source, args.range_set)
+    contents = loader.load_sources(args.source, args.range_set)
     
     if args.repl or args.script:
         code = utils.read_file(args.script) if args.script else ''

@@ -2,7 +2,7 @@ import re
 from os.path import join, dirname
 import sys
 import unittest
-from snarf.snarf import Content, BeautifulSoup
+from snarf.snarf import Contents, BeautifulSoup
 from snarf import script
 from snarf import utils
 try:
@@ -12,41 +12,44 @@ except ImportError:
 
 
 R = re.compile
-#-------------------------------------------------------------------------------
 
-def read_data(basename):
+#-------------------------------------------------------------------------------
+def read_test_data(basename):
     return utils.read_file(join(dirname(__file__), 'data', basename))
 
 
 #-------------------------------------------------------------------------------
 def display(what):
-    print '~' * 60
-    print what
-    print '~' * 60
+    print '{0}\n{1}\n{0}'.format('~' * 60, what)
 
 
 #===============================================================================
-class TestLines(object):
+class TestLines(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_simple(self):
-        data = read_data('lines.txt')
-        lines = Content(data.splitlines())
-        lines.compress()
-        assert unicode(lines) == '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456'''
+        data = read_test_data('lines.txt')
+        lines = Contents([data])
+
+        lines.strip()
+        text = unicode(lines)
+        self.assertMultiLineEqual(text, u'''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456''')
     
         lines.skip_to('123', False)
-        assert unicode(lines) == 'u6ejtryn\n456'
+        text = unicode(lines)
+        self.assertMultiLineEqual(text, u'u6ejtryn\n456')
     
         lines.read_until('456', False)
-        assert unicode(lines) == u'u6ejtryn'
+        text = unicode(lines)
+        self.assertEqual(text, u'u6ejtryn')
     
         lines.end()
-        assert unicode(lines) == u'u6ejtryn\n456'
+        text = unicode(lines)
+        self.assertMultiLineEqual(text, u'u6ejtryn\n456')
 
 
 #===============================================================================
-class TestInstructions(object):
+class TestInstructions(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def _do_instruction(self, line, expect):
@@ -107,39 +110,27 @@ class TestInstructions(object):
 #===============================================================================
 class TestHTML(unittest.TestCase):
     
-    EXPECTED_HTML = '''<html>
-<head>
-    <title>Links</title>
-</head>
-<body>
-    0
-    <a href="/links/10/1">1</a>
-    <a href="/links/10/2">2</a>
-    <a href="/links/10/3">3</a>
-    <a href="/links/10/4">4</a>
-    <a href="/links/10/5">5</a>
-    <a href="/links/10/6">6</a>
-    <a href="/links/10/7">7</a>
-    <a href="/links/10/8">8</a>
-    <a href="/links/10/9">9</a>
-</body>
-</html>'''
+    EXPECTED_ATTRS = ['/links/10/{}'.format(i) for i in range(1,10)]
+    maxDiff = None
     
     #---------------------------------------------------------------------------
     def setUp(self):
-        self.data = utils.read_url('http://httpbin.org/links/10/0')
+        self.data = read_test_data('httpbin_links.html')
     
     #---------------------------------------------------------------------------
     def test_select_attr(self):
-        h = Content(BeautifulSoup(self.data))
+        bs = BeautifulSoup(self.data)
+        h = Contents([bs])
         h.select_attr('a', 'href')
-        assert h.lines == ['/links/10/{}'.format(i) for i in range(1,10)]
+        lines = h.data_merge()
+        self.assertSequenceEqual(lines, self.EXPECTED_ATTRS)
 
     #---------------------------------------------------------------------------
     def test_dumps(self):
-        h = Content(BeautifulSoup(self.data))
-        #pdb.set_trace()
-        assert unicode(h) == self.EXPECTED_HTML
+        bs = BeautifulSoup(self.data)
+        h = Contents([bs])
+        text = unicode(h)
+        self.assertMultiLineEqual(text, read_test_data('expected_httpbin_links.html'))
 
 
 ################################################################################

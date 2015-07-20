@@ -3,7 +3,7 @@ import re
 import os
 import json
 from pprint import pformat
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, NavigableString, PageElement
 from . import utils
 from . import markup
 import strutil
@@ -21,9 +21,7 @@ def is_lines(what):
 
 #-------------------------------------------------------------------------------
 def is_soup(what):
-    return isinstance(what, BeautifulSoup)
-
-
+    return isinstance(what, (BeautifulSoup, PageElement))
 
 
 #-------------------------------------------------------------------------------
@@ -155,6 +153,10 @@ class Content(object):
         self._data = Bits.create(data, guess)
     
     #---------------------------------------------------------------------------
+    def __repr__(self):
+        return 'Content({})'.format(self._data.__class__.__name__)
+    
+    #---------------------------------------------------------------------------
     def __unicode__(self):
         return unicode(self._data)
     
@@ -163,34 +165,31 @@ class Content(object):
         return iter(self._data)
     
     #---------------------------------------------------------------------------
-    @property
     def text(self):
         return unicode(self._data)
     
     #---------------------------------------------------------------------------
-    @property
     def lines(self):
         return unicode(self._data).splitlines()
     
     #---------------------------------------------------------------------------
-    @property
     def soup(self):
         return BeautifulSoup(unicode(self._data))
     
     #---------------------------------------------------------------------------
     def remove_each(self, items, **kws):
-        return Content(strutil.remove_each(self.text, items, **kws))
+        return Content(strutil.remove_each(self.text(), items, **kws))
     
     #---------------------------------------------------------------------------
     def replace_each(self, items, **kws):
-        return Content(strutil.replace_each(self.text, items, **kws))
+        return Content(strutil.replace_each(self.text(), items, **kws))
     
     #---------------------------------------------------------------------------
     def _call_cmd(self, cmd, args):
         if is_string(args):
             args = args.split(',')
         
-        soup = self.soup
+        soup = self.soup()
         for item in args:
             for el in soup.select(item):
                 method = getattr(el, cmd)
@@ -204,7 +203,7 @@ class Content(object):
     
     #---------------------------------------------------------------------------
     def unwrap_attr(self, query, attr):
-        soup = self.soup
+        soup = self.soup()
         for el in soup.select(query):
             el.replace_with(getattr(el, 'attrs', {}).get(attr, ''))
             
@@ -216,7 +215,7 @@ class Content(object):
     
     #---------------------------------------------------------------------------
     def replace_with(self, query, what):
-        soup = self.soup
+        soup = self.soup()
         for el in soup.select(query):
             el.replace_with(what)
         
@@ -224,14 +223,14 @@ class Content(object):
         
     #---------------------------------------------------------------------------
     def select(self, query):
-        results = self.soup.select(query)
+        results = self.soup().select(query)
         verbose('Selected {} matches', len(results))
         return Content(beautiful_results(results)) if results else self
 
     #---------------------------------------------------------------------------
     def select_attr(self, query, attr, test=bool):
         results = []
-        for el in self.soup.select(query):
+        for el in self.soup().select(query):
             if el.attrs and attr in el.attrs:
                 value = el.attrs[attr]
                 if test(value):
@@ -245,7 +244,7 @@ class Content(object):
             attrs = attrs if attrs == '*' else attrs.split(',')
 
         attrs = attrs or BAD_ATTRS
-        soup = self.soup
+        soup = self.soup()
         for el in soup.descendants:
             if hasattr(el, 'attrs'):
                 if attrs == '*':
@@ -268,27 +267,27 @@ class Content(object):
 
     #---------------------------------------------------------------------------
     def collapse(self, query, joiner=' '):
-        soup = self.soup
+        soup = self.soup()
         for item in soup.select(query):
-            item.string = joiner.join([s.strip() for s in item.text.split()])
+            item.string = joiner.join([s.strip() for s in item.text().split()])
             
         return Content(soup)
 
     #---------------------------------------------------------------------------
     def format(self, fmt):
-        return Content([fmt.format(l) for l in self.lines])
+        return Content([fmt.format(l) for l in self.lines()])
     
     #---------------------------------------------------------------------------
     def compress(self):
-        return Content([' '.join(l.strip().split()) for l in self.lines])
+        return Content([' '.join(l.strip().split()) for l in self.lines()])
     
     #---------------------------------------------------------------------------
     def strip(self):
-        return Content([l.strip() for l in self.lines])
+        return Content([l.strip() for l in self.lines()])
         
     #---------------------------------------------------------------------------
     def skip_to(self, what, keep=True):
-        lines = self.lines
+        lines = self.lines()
         found = strutil.find_first(lines, what)
         if found is not None:
             if not keep:
@@ -300,7 +299,7 @@ class Content(object):
         
     #----------------------------------------------------------------------------
     def read_until(self, what, keep=True):
-        lines = self.lines
+        lines = self.lines()
         found = strutil.find_first(lines, what)
         if found is not None:
             if keep:
@@ -312,7 +311,7 @@ class Content(object):
 
     #---------------------------------------------------------------------------
     def matches(self, what):
-        return Content([l for l in self.lines if strutil.matches(l, what)])
+        return Content([l for l in self.lines() if strutil.matches(l, what)])
 
 
 #===============================================================================
@@ -321,7 +320,7 @@ class Contents(object):
     #---------------------------------------------------------------------------
     def __init__(self, contents=None, guess=False):
         self.stack = []
-        self.contents = self.set(contents, guess=guess)
+        self.set_contents(contents, guess=guess)
     
     #---------------------------------------------------------------------------
     def __iter__(self):
@@ -346,7 +345,7 @@ class Contents(object):
     #---------------------------------------------------------------------------
     def update(self, contents):
         self.stack.append(self.contents)
-        self.set(contents)
+        self.set_contents(contents)
     
     #---------------------------------------------------------------------------
     def __getattr__(self, attr):
@@ -360,31 +359,36 @@ class Contents(object):
         return handler
 
     #---------------------------------------------------------------------------
+    def data_merge(self):
+        data = None
+        if self.contents:
+            ct = self.contents[0]._data
+            if isinstance(ct, Lines):
+                data = []
+                for ct in self.contents:
+                    data.extend(ct._data)
+            elif isinstance(ct, Soup):
+                data = BeautifulSoup()
+                for ct in self.contents:
+                    data.contents.extend(ct._data.body())
+            else:
+                data = '\n'.join(unicode(ct) for ct in contents)
+        
+        return data
+    
+    #---------------------------------------------------------------------------
     def combine(self):
         '''
         Distill contents into a single piece of content.
         '''
-        ct = self.contents[0]._data
-        if isinstance(ct, Lines):
-            data = []
-            for ct in self.contents:
-                data.extend(ct._data)
-        elif isinstance(ct, Soup):
-            data = BeautifulSoup()
-            for ct in self.contents:
-                data.contents.extend(ct._data.body())
-        else:
-            data = '\n'.join(unicode(ct) for ct in contents)
-            
-        return Content(data)
+        if self.contents:
+            data = self.data_merge()
+            self.update([Content(data)])
         
     #---------------------------------------------------------------------------
-    def set(self, contents, guess=False):
+    def set_contents(self, contents, guess=False):
         self.contents = []
         if contents:
-            if utils.is_string(contents):
-                contents = [contents]
-            
             for content in contents:
                 if not isinstance(content, Content):
                     content = Content(content, guess=guess)
