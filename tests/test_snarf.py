@@ -1,10 +1,12 @@
 import re
-from os.path import join, dirname
+import shutil
+from os.path import join, dirname, exists
 import sys
 import unittest
 from snarf.snarf import Contents, BeautifulSoup
 from snarf import script
 from snarf import utils
+from snarf.loader import Loader
 try:
     import ipdb as pdb
 except ImportError:
@@ -13,9 +15,13 @@ except ImportError:
 
 R = re.compile
 
+THIS_DIR = dirname(__file__)
+FIXTURES_DIR = join(THIS_DIR, 'fixtures')
+DATA_DIR = join(FIXTURES_DIR, 'data')
+
 #-------------------------------------------------------------------------------
 def read_test_data(basename):
-    return utils.read_file(join(dirname(__file__), 'data', basename))
+    return utils.read_file(join(DATA_DIR, basename))
 
 
 #-------------------------------------------------------------------------------
@@ -52,59 +58,47 @@ class TestLines(unittest.TestCase):
 class TestInstructions(unittest.TestCase):
 
     #---------------------------------------------------------------------------
-    def _do_instruction(self, line, expect):
-        cmd, args, kws = expect
+    def _do_instruction(self, line, expect_cmd, expect_args=None, expect_kws=None):
+        expect_args = expect_args or ()
+        expect_kws = expect_kws or {}
         prog = script.Script(line)
         inst = prog.instructions[0]
 
-        assert inst.cmd == cmd
-        for actual, expect in zip(inst.args, args):
+        self.assertEqual(inst.cmd, expect_cmd)
+        self.assertEqual(len(inst.args), len(expect_args))
+        for actual, expect in zip(inst.args, expect_args):
             if utils.is_regex(expect):
-                assert expect.pattern == actual.pattern
+                self.assertEqual(expect.pattern, actual.pattern)
             else:
-                assert actual == expect
+                self.assertEqual(actual, expect)
             
-        assert inst.kws == kws
+        self.assertDictEqual(inst.kws, expect_kws)
 
     #---------------------------------------------------------------------------
-    def test_instruction1(self):
-        self._do_instruction("foo bar 'baz spam'", ('foo', ['bar', 'baz spam'], {}))
-
-    #---------------------------------------------------------------------------
-    def test_instruction2(self):
-        self._do_instruction("x r'[abc]'", ('x', [R('[abc]')], {}))
-
-    #---------------------------------------------------------------------------
-    def test_instruction3(self):
-        self._do_instruction("z foo=bar baz 'foo'", (
-            'z',
-            ['baz', 'foo'],
-            {'foo': 'bar'}
-        ))
-
-    #---------------------------------------------------------------------------
-    def test_instruction4(self):
-        self._do_instruction("""replace r'a+b' x='a b c' y=23 z=True baz=r'spam+'""", (
+    def test_parse_instruction(self):
+        self._do_instruction("foo bar 'baz spam'", 'foo', ['bar', 'baz spam'], {})
+        self._do_instruction("x r'[abc]'", 'x', [R('[abc]')], {})
+        self._do_instruction("z foo=bar baz 'foo'", 'z', ['baz', 'foo'], {'foo': 'bar'})
+        
+        self._do_instruction(
+            """replace r'a+b' x='a b c' y=23 z=True baz=r'spam+'""",
             'replace',
             [R('a+b')],
             {'x': 'a b c', 'y': 23, 'z': True, 'baz': R('spam+')}
-        ))
+        )
 
-    #---------------------------------------------------------------------------
-    def test_instruction5(self):
-        self._do_instruction("""commandx _=34 __=None""", (
+        self._do_instruction(
+            """commandx _=34 __=None""",
             'commandx',
-            [],
-            {'_': 34, '__': None}
-        ))
-
-    #---------------------------------------------------------------------------
-    def test_instruction6(self):
-        self._do_instruction("""command abc7 'True' _ _=34 __=None""", (
+            expect_kws={'_': 34, '__': None}
+        )
+        
+        self._do_instruction(
+            """command abc7 'True' _ _=34 __=None""",
             'command',
             ['abc7', 'True', '_'],
             {'_': 34, '__': None}
-        ))
+        )
 
 
 #===============================================================================
@@ -131,6 +125,30 @@ class TestHTML(unittest.TestCase):
         h = Contents([bs])
         text = unicode(h)
         self.assertMultiLineEqual(text, read_test_data('expected_httpbin_links.html'))
+
+
+#===============================================================================
+class TestLoader(unittest.TestCase):
+    
+    #---------------------------------------------------------------------------
+    def setUp(self):
+        self.snarf_dir = join(THIS_DIR, 'cache')
+    
+    #---------------------------------------------------------------------------
+    def tearDown(self):
+        if exists(self.snarf_dir):
+            # probably overly excessive sanity here
+            start = os.path.expanduser('~')
+            if self.snarf_dir.startswith(start):
+                shutil.rmtree(self.snarf_dir)
+            else:
+                print 'Unable to remove cache directory "{}"'.format(self.snarf_dir)
+        
+    #---------------------------------------------------------------------------
+    def test_cache_dir_creation(self):
+        loader = Loader(use_cache=True, cache_base=self.snarf_dir)
+        self.assertEqual(loader.cache_dir, join(self.snarf_dir, 'snarf', 'cache'))
+        self.assertTrue(exists(loader.cache_dir))
 
 
 ################################################################################

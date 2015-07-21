@@ -27,6 +27,7 @@ USER_AGENTS = (
 )
 
 logger = logging.getLogger('snarf')
+logger.addHandler(logging.NullHandler())
 
 #---------------------------------------------------------------------------
 def read_url(url, as_text=True):
@@ -48,18 +49,14 @@ def seq(what):
 
 
 #-------------------------------------------------------------------------------
-def configure_logger(debug=False):
-    if debug:
-        console = logging.StreamHandler()
-        fmt = logging.Formatter(
-            '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
-            '%Y-%m-%d %H:%M:%S'
-        )
-        console.setFormatter(fmt)
-        logger.addHandler(console)
-        logger.setLevel(logging.DEBUG)
-    elif not logger.handlers:
-        logger.addHandler(logging.NullHandler())
+def enable_debug_logger():
+    console = logging.StreamHandler()
+    console.setFormatter(logging.Formatter(
+        '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
+        '%Y-%m-%d %H:%M:%S'
+    ))
+    logger.addHandler(console)
+    logger.setLevel(logging.DEBUG)
 
 
 #-------------------------------------------------------------------------------
@@ -147,7 +144,13 @@ def get_range_set(text):
 
 
 #-------------------------------------------------------------------------------
-def expand_range_set(sources, range_set):
+def expand_range_set(sources, range_set=None):
+    if is_string(sources):
+        sources = [sources]
+    
+    if not range_set:
+        return sources
+        
     results = []
     chars = get_range_set(range_set)
     for src in sources:

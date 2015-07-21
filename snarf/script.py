@@ -334,7 +334,8 @@ class Program(object):
         '''
         Load new resource(s).
         '''
-        contents = self.loader.load_sources(args, **kws)
+        sources = utils.expand_range_set(*args)
+        contents = self.loader.load_sources(sources)
         self.contents.set(contents)
     
     #---------------------------------------------------------------------------

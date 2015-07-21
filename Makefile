@@ -1,11 +1,19 @@
+TESTS=
+
 init:
 	pip install -r requirements.txt
 
 test:
 	py.test tests
 
+test-only:
+	# Example: make test-only TEST="select"
+	@echo Only testing $(TESTS)
+	py.test tests -k $(TESTS)
+
 unittest:
-	python -m unittest discover -s tests
+	@echo $(TESTS)
+	python -m unittest discover -s tests $(TESTS)
 
 develop:
 	pip install -e .

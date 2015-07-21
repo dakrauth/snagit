@@ -39,13 +39,16 @@ def run_program(prog_args=None):
     if args.pdb:
         utils.pdb.set_trace()
         
-    utils.configure_logger(args.verbose)
+    if args.verbose:
+        utils.enable_debug_logger()
+    
     verbose('{}', args)
     loader = Loader()
     if args.cache:
         loader.use_cache()
     
-    contents = loader.load_sources(args.source, args.range_set)
+    sources = utils.expand_range_set(args.source, args.range_set)
+    contents = loader.load_sources(sources)
     
     if args.repl or args.script:
         code = utils.read_file(args.script) if args.script else ''
