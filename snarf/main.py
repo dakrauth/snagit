@@ -45,7 +45,7 @@ def run_program(prog_args=None):
     verbose('{}', args)
     loader = Loader()
     if args.cache:
-        loader.use_cache()
+        loader.use_cache = True
     
     sources = utils.expand_range_set(args.source, args.range_set)
     contents = loader.load_sources(sources)

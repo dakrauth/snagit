@@ -1,6 +1,5 @@
 import re
 import os
-import atexit
 import codecs
 import random
 import logging

@@ -1,4 +1,5 @@
 import os
+import atexit
 from urlparse import urlparse, ParseResult
 
 try:
@@ -84,7 +85,7 @@ class Loader(object):
         return pth
         
     #---------------------------------------------------------------------------
-    def load_history(filename='.history'):
+    def load_history(self, filename='.history'):
         if not readline:
             return
         
