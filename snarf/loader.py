@@ -85,17 +85,20 @@ class Loader(object):
         return pth
         
     #---------------------------------------------------------------------------
-    def load_history(self, filename='.history'):
+    def load_history(self, filename='history'):
         if not readline:
             return
         
         base = self.get_directory(self.snarf_dir)
         histfile = os.path.join(base, filename)
+        verbose('Reading history file: {}'.format(histfile))
         try:
             readline.read_history_file(histfile)
+        except IOError as e:
+            verbose('Error using `readline` history: {}'.format(e))
+        else:
+            verbose('History file at {} bytes'.format(readline.get_current_history_length()))
             atexit.register(readline.write_history_file, histfile)
-        except IOError:
-            verbose('Error using `readline` history')
     
     #---------------------------------------------------------------------------
     def load_sources(self, sources):
@@ -126,7 +129,7 @@ class Loader(object):
             data = utils.read_file(filename)
             __, data = data.split('\n', 1)
         else:
-            data = utils.read_url(url)
+            data, content_type = utils.read_url(url)
             verbose('Retrieved {} bytes from {}', len(data), url)
             if filename:
                 if not os.path.exists(dirname):

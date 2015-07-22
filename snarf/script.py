@@ -6,6 +6,7 @@ import inspect
 import functools
 import traceback
 from pprint import pformat
+from requests.exceptions import RequestException
 import strutil
 from . import utils
 from . import snarf
@@ -281,6 +282,14 @@ class Program(object):
         return self.contents
     
     #---------------------------------------------------------------------------
+    def cmd_verbose(self, args, kws):
+        '''
+        Enable verbosity.
+        '''
+        utils.enable_debug_logger()
+        verbose('Verbose logging enabled')
+    
+    #---------------------------------------------------------------------------
     def cmd_list(self, args, kws):
         '''
         List all lines of source code if not empty.
@@ -327,7 +336,7 @@ class Program(object):
         '''
         Enable caching.
         '''
-        self.loader.use_cache()
+        self.loader.use_cache = True
     
     #---------------------------------------------------------------------------
     def cmd_load(self, args, kws):
@@ -335,8 +344,12 @@ class Program(object):
         Load new resource(s).
         '''
         sources = utils.expand_range_set(*args)
-        contents = self.loader.load_sources(sources)
-        self.contents.set(contents)
+        try:
+            contents = self.loader.load_sources(sources)
+        except RequestException as exc:
+            print 'ERROR: {}'.format(exc)
+        else:
+            self.contents.update(contents)
     
     #---------------------------------------------------------------------------
     def cmd_load_all(self, args, kws):

@@ -26,8 +26,8 @@ def parse_args(args=None):
         help='script file to execute agains <source>')
     parser.add_argument('-o', '--output',
         help='output resultant content to specified file')
-    parser.add_argument('--repl', action='store_true',
-        help='Enter REPL script mode')
+    parser.add_argument('-i', '--repl', action='store_true',
+        help='Enter interactive (REPL) script mode')
     
     return parser.parse_args(args)
 
@@ -49,24 +49,22 @@ def run_program(prog_args=None):
     
     sources = utils.expand_range_set(args.source, args.range_set)
     contents = loader.load_sources(sources)
+    code = utils.read_file(args.script) if args.script else ''
+    prog = script.Program(code, contents, loader, do_pm=args.pm)
+    if code:
+        contents = prog.execute()
     
-    if args.repl or args.script:
-        code = utils.read_file(args.script) if args.script else ''
-        scr = script.Program(code, contents, loader, do_pm=args.pm)
-        if code:
-            contents = scr.execute()
+    if args.repl or not args.script:
+        contents = prog.repl()
     
-        if args.repl:
-            contents = scr.repl()
-    
-    if args.output and contents:
+    if contents:
         data = '\n'.join([unicode(c) for c in contents])
         verbose('Writing {} bytes', len(data))
-        if args.output == '-':
-            sys.stdout.write(data.encode('utf8') + '\n')
-        else:
+        if args.output:
             utils.write_file(args.output, data)
             verbose('Saved to {}', args.output)
+        else:
+            sys.stdout.write(data.encode('utf8') + '\n')
     
     verbose('Completed in {} seconds', datetime.now() - start)
     return contents

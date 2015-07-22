@@ -332,7 +332,8 @@ class Contents(object):
     
     #---------------------------------------------------------------------------
     def __unicode__(self):
-        return '\n'.join([unicode(c) for c in self])
+        bits = [unicode(c) for c in self]
+        return '\n'.join(bits)
     
     #---------------------------------------------------------------------------
     def __getitem__(self, index):
@@ -344,11 +345,15 @@ class Contents(object):
     
     #---------------------------------------------------------------------------
     def update(self, contents):
-        self.stack.append(self.contents)
+        if self.contents:
+            self.stack.append(self.contents)
         self.set_contents(contents)
     
     #---------------------------------------------------------------------------
     def __getattr__(self, attr):
+        if not hasattr(Content, attr):
+            raise AttributeError('Unknown attribute "{}"'.format(attr))
+            
         def handler(*args, **kws):
             contents = []
             for ct in self.contents:
@@ -372,7 +377,7 @@ class Contents(object):
                 for ct in self.contents:
                     data.contents.extend(ct._data.body())
             else:
-                data = '\n'.join(unicode(ct) for ct in contents)
+                data = '\n'.join(unicode(ct) for ct in self.contents)
         
         return data
     

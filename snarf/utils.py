@@ -3,6 +3,7 @@ import os
 import codecs
 import random
 import logging
+import mimetypes
 import itertools
 from strutil import is_string, is_regex
 
@@ -28,13 +29,29 @@ USER_AGENTS = (
 logger = logging.getLogger('snarf')
 logger.addHandler(logging.NullHandler())
 
+#-------------------------------------------------------------------------------
+def guess_extension(content_type):
+    if ';' in content_type:
+        content_type = content_type.split(';')[0]
+    
+    ext = mimetypes.guess_extension(content_type, False)
+    if not ext:
+        content_type = content_type.replace('/x-', '/')
+        ext = mimetypes.guess_extension(content_type, False)
+    
+    return ext or ''
+
+
 #---------------------------------------------------------------------------
-def read_url(url, as_text=True):
+def read_url(url):
     '''
-    Read data from ``url``. Date can be plain text or bytes.
+    Read data from ``url``.
+    
+    Returns a 2-tuple of (text, content_type)
     '''
     r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)})
-    return r.text if as_text else r.content
+    ct = r.headers.get('content-type')
+    return (r.text, ct)
 
 
 #-------------------------------------------------------------------------------
@@ -47,16 +64,20 @@ def seq(what):
     return [what] if is_string(what) else what
 
 
-#-------------------------------------------------------------------------------
-def enable_debug_logger():
-    console = logging.StreamHandler()
-    console.setFormatter(logging.Formatter(
-        '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
-        '%Y-%m-%d %H:%M:%S'
-    ))
-    logger.addHandler(console)
-    logger.setLevel(logging.DEBUG)
+_console = logging.StreamHandler()
+_console.setFormatter(logging.Formatter(
+    '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
+    '%Y-%m-%d %H:%M:%S'
+))
 
+#-------------------------------------------------------------------------------
+def enable_debug_logger(enable=True):
+    if enable:
+        logger.addHandler(_console)
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.removeHandler(_console)
+        logger.setLevel(logging.WARN)
 
 #-------------------------------------------------------------------------------
 def verbose(fmt, *args):
