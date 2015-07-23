@@ -57,14 +57,14 @@ def run_program(prog_args=None):
     if args.repl or not args.script:
         contents = prog.repl()
     
-    if contents:
+    if contents and args.output:
         data = '\n'.join([unicode(c) for c in contents])
         verbose('Writing {} bytes', len(data))
-        if args.output:
+        if args.output == '-':
+            sys.stdout.write(data.encode('utf8') + '\n')
+        else:
             utils.write_file(args.output, data)
             verbose('Saved to {}', args.output)
-        else:
-            sys.stdout.write(data.encode('utf8') + '\n')
     
     verbose('Completed in {} seconds', datetime.now() - start)
     return contents

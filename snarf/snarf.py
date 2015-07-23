@@ -3,7 +3,7 @@ import re
 import os
 import json
 from pprint import pformat
-from bs4 import BeautifulSoup, NavigableString, PageElement
+import bs4 as beautiful_soup
 from . import utils
 from . import markup
 import strutil
@@ -21,7 +21,17 @@ def is_lines(what):
 
 #-------------------------------------------------------------------------------
 def is_soup(what):
-    return isinstance(what, (BeautifulSoup, PageElement))
+    return isinstance(what, (beautiful_soup.BeautifulSoup, beautiful_soup.PageElement))
+
+
+#-------------------------------------------------------------------------------
+def is_navigable_string(what):
+    return isinstance(what, beautiful_soup.NavigableString)
+
+
+#-------------------------------------------------------------------------------
+def make_soup(markup=''):
+    return beautiful_soup.BeautifulSoup(markup, 'html.parser')
 
 
 #-------------------------------------------------------------------------------
@@ -32,7 +42,7 @@ def beautiful_results(results):
     For example, ``results`` would be the expected return from ``soup.select``
     or ``soup.find_all``.
     '''
-    soup = BeautifulSoup()
+    soup = make_soup()
     soup.contents = results
     return soup
 
@@ -51,7 +61,7 @@ class Bits(object):
     #---------------------------------------------------------------------------
     def serialize(self, format):
         data = unicode(self._data)
-        return "'''{}'''".format(data) if format == 'python' else data
+        return u"'''{}'''".format(data) if format == 'python' else data
 
     #---------------------------------------------------------------------------
     def __str__(self):
@@ -72,7 +82,7 @@ class Bits(object):
             if guess:
                 c = content.strip()
                 if c.startswith('<') and c.endswith('>'):
-                    return Soup(BeautifulSoup(data))
+                    return Soup(data)
             return Text(data)
             
         raise ValueError('Cannot create data type, must be string or list')
@@ -104,7 +114,7 @@ class Soup(Bits):
     
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        self._data = data if is_soup(data) else BeautifulSoup(unicode(data))
+        self._data = data if is_soup(data) else make_soup(unicode(data))
 
     #---------------------------------------------------------------------------
     def __unicode__(self):
@@ -117,7 +127,7 @@ class Soup(Bits):
             values = []
             results.append(values)
             for content in item.contents:
-                if isinstance(content, NavigableString):
+                if is_navigable_string(content):
                     content = content.strip()
                     if content:
                         values.append(content)
@@ -174,7 +184,7 @@ class Content(object):
     
     #---------------------------------------------------------------------------
     def soup(self):
-        return BeautifulSoup(unicode(self._data))
+        return make_soup(unicode(self._data))
     
     #---------------------------------------------------------------------------
     def remove_each(self, items, **kws):
@@ -257,7 +267,7 @@ class Content(object):
     #---------------------------------------------------------------------------
     def serialize(self, format='python', variable='data'):
         if format == 'python':
-            text = '{} = {}'.format(variable, self._data.serialize(format))
+            text = u'{} = {}'.format(variable, self._data.serialize(format))
         elif format == 'json':
             text = json.dumps(self._data.serialize(format))
         else:
@@ -373,7 +383,7 @@ class Contents(object):
                 for ct in self.contents:
                     data.extend(ct._data)
             elif isinstance(ct, Soup):
-                data = BeautifulSoup()
+                data = make_soup()
                 for ct in self.contents:
                     data.contents.extend(ct._data.body())
             else:

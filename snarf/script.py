@@ -208,14 +208,18 @@ class Program(object):
     #---------------------------------------------------------------------------
     def _get_command(self, cmd):
         return getattr(self, 'cmd_' + cmd, None)
-        
+    
+    #---------------------------------------------------------------------------
+    def get_input(self, prompt='> '):
+        return raw_input('> ').strip()
+    
     #---------------------------------------------------------------------------
     def repl(self):
         self.loader.load_history()
         print 'Type "help" for more information. Ctrl+c to exit'
         while True:
             try:
-                line = raw_input('> ').strip()
+                line = self.get_input()
             except (EOFError, KeyboardInterrupt):
                 break
             
@@ -286,8 +290,9 @@ class Program(object):
         '''
         Enable verbosity.
         '''
-        utils.enable_debug_logger()
-        verbose('Verbose logging enabled')
+        enable = args[0] if args else True
+        utils.enable_debug_logger(enable)
+        verbose('Verbose logging {}'.format('enabled' if enable else 'disabled'))
     
     #---------------------------------------------------------------------------
     def cmd_list(self, args, kws):
@@ -343,7 +348,8 @@ class Program(object):
         '''
         Load new resource(s).
         '''
-        sources = utils.expand_range_set(*args)
+        range_set = kws.get('range_set', kws.get('range'))
+        sources = utils.expand_range_set(args, range_set)
         try:
             contents = self.loader.load_sources(sources)
         except RequestException as exc:

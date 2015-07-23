@@ -3,6 +3,8 @@ import os
 import codecs
 import random
 import logging
+from copy import deepcopy
+from logging.config import dictConfig
 import mimetypes
 import itertools
 from strutil import is_string, is_regex
@@ -17,17 +19,50 @@ try:
 except ImportError:
     import pdb
 
-DEFAULT_DELIMITER = '@@@'
-USER_AGENTS = (
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
-    'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:22.0) Gecko/20100 101 Firefox/22.0',
-    'Mozilla/5.0 (Windows NT 6.1; rv:11.0) Gecko/20100101 Firefox/11.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
-    'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
-)
+
+DEFAULT_CONFIG = {
+    'range_delimiter': '{}',
+    'user_agents': (
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
+        'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:22.0) Gecko/20100 101 Firefox/22.0',
+        'Mozilla/5.0 (Windows NT 6.1; rv:11.0) Gecko/20100101 Firefox/11.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
+        'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
+    ),
+    'debug_logging': {
+        'version': 1,
+        'formatters': { 'snarf': {
+            'format': '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        }},
+        'handlers': { 'snarf': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'snarf',
+            'level': logging.DEBUG
+        }},
+        'loggers': { 'snarf': { 'handlers': ['snarf'], 'level': logging.DEBUG }}
+    }
+}
+
 
 logger = logging.getLogger('snarf')
 logger.addHandler(logging.NullHandler())
+
+_config_settings = deepcopy(DEFAULT_CONFIG)
+
+#-------------------------------------------------------------------------------
+def set_config(**kws):
+    global _config_settings
+    new_config = deepcopy(_config_settings)
+    new_config.update(kws)
+    _config_settings = new_config
+    return new_config
+
+
+#-------------------------------------------------------------------------------
+def get_config(key=None, default=None):
+    return _config_settings.get(key, default) if key else _config_settings
+
 
 #-------------------------------------------------------------------------------
 def guess_extension(content_type):
@@ -49,7 +84,12 @@ def read_url(url):
     
     Returns a 2-tuple of (text, content_type)
     '''
-    r = requests.get(url, headers={'User-Agent': random.choice(USER_AGENTS)})
+    ua = get_config('user_agents')
+    headers = {'User-Agent': random.choice(ua)} if ua else None
+    r = requests.get(url, headers=headers)
+    if not r.ok:
+        raise requests.HTTPError('URL {}: {}'.format(r.reason, url))
+        
     ct = r.headers.get('content-type')
     return (r.text, ct)
 
@@ -64,20 +104,16 @@ def seq(what):
     return [what] if is_string(what) else what
 
 
-_console = logging.StreamHandler()
-_console.setFormatter(logging.Formatter(
-    '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
-    '%Y-%m-%d %H:%M:%S'
-))
-
 #-------------------------------------------------------------------------------
 def enable_debug_logger(enable=True):
     if enable:
-        logger.addHandler(_console)
-        logger.setLevel(logging.DEBUG)
+        config = get_config('debug_logging')
+        if config:
+            dictConfig(config)
+        logger.disabled = 0
     else:
-        logger.removeHandler(_console)
-        logger.setLevel(logging.WARN)
+        logger.disabled = 1
+
 
 #-------------------------------------------------------------------------------
 def verbose(fmt, *args):
@@ -173,8 +209,9 @@ def expand_range_set(sources, range_set=None):
         
     results = []
     chars = get_range_set(range_set)
+    delim = get_config('range_delimiter')
     for src in sources:
-        results.extend([src.replace('{}', c) for c in chars])
+        results.extend([src.replace(delim, c) for c in chars])
     
     return results
 
