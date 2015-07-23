@@ -285,7 +285,8 @@ class Content(object):
     def collapse(self, query, joiner=' '):
         soup = self.soup()
         for item in soup.select(query):
-            item.string = joiner.join([s.strip() for s in item.text().split()])
+            bits = list(i.strip() for i in item.stripped_strings)
+            item.string = joiner.join(bits)
             
         return Content(soup)
 

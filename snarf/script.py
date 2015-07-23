@@ -540,7 +540,7 @@ class Program(object):
         '''
         Given a CSS selector, combine multiple whitespace chars into a single space and trim.
         '''
-        self.contents.collapse(args, **kws)
+        self.contents.collapse(args[0], **kws)
 
 
 #-------------------------------------------------------------------------------
