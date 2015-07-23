@@ -1,5 +1,7 @@
+from __future__ import unicode_literals
 import re
 import os
+import six
 import codecs
 import random
 import logging
@@ -18,7 +20,6 @@ try:
     import ipdb as pdb
 except ImportError:
     import pdb
-
 
 DEFAULT_CONFIG = {
     'range_delimiter': '{}',
@@ -47,6 +48,7 @@ DEFAULT_CONFIG = {
 
 logger = logging.getLogger('snarf')
 logger.addHandler(logging.NullHandler())
+
 
 _config_settings = deepcopy(DEFAULT_CONFIG)
 

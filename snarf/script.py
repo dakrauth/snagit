@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import os
 import re
 import sys
@@ -7,6 +8,7 @@ import functools
 import traceback
 from pprint import pformat
 from requests.exceptions import RequestException
+from prompt_toolkit.shortcuts import get_input
 import strutil
 from . import utils
 from . import snarf
@@ -211,12 +213,12 @@ class Program(object):
     
     #---------------------------------------------------------------------------
     def get_input(self, prompt='> '):
-        return raw_input('> ').strip()
+        return get_input(prompt).strip()
     
     #---------------------------------------------------------------------------
     def repl(self):
         self.loader.load_history()
-        print 'Type "help" for more information. Ctrl+c to exit'
+        print('Type "help" for more information. Ctrl+c to exit')
         while True:
             try:
                 line = self.get_input()
@@ -237,8 +239,8 @@ class Program(object):
             try:
                 self.execute(instrs)
             except ProgramWarning as why:
-                print why
-        print
+                print(why)
+        print('\n')
         return self.contents
     
     #---------------------------------------------------------------------------
@@ -274,7 +276,7 @@ class Program(object):
                 utils.logger.error('{0} Entering post_mortem {0}'.format('*' * 8))
                 post_mortem(tb)
             else:
-                print traceback.print_exc()
+                print(traceback.print_exc())
             raise ProgramError('Line {}: {}'.format(instr.lineno, value))
     
     #---------------------------------------------------------------------------
@@ -299,7 +301,7 @@ class Program(object):
         '''
         List all lines of source code if not empty.
         '''
-        print '\n'.join(self.script.listing())
+        print('\n'.join(self.script.listing()))
     
     #---------------------------------------------------------------------------
     def cmd_help(self, args, kws):
@@ -309,16 +311,16 @@ class Program(object):
         cmds = self._get_commands()
         fmt = ' - ({})'.format
         if not args:
-            print 'Commands:'
-            print '\n'.join(['    {}{}'.format(s,fmt(k) if k else '') for s,n,m,k,d in cmds])
+            print('Commands:')
+            print('\n'.join(['    {}{}'.format(s,fmt(k) if k else '') for s,n,m,k,d in cmds]))
         else:
             for cmd, method_name, method, kind, docstr in cmds:
                 if kind:
                     cmd += fmt(kind)
 
-                print cmd
+                print(cmd)
                 if docstr:
-                    print docstr
+                    print(docstr)
     
     #---------------------------------------------------------------------------
     def cmd_combine(self, args, kws):
@@ -353,7 +355,7 @@ class Program(object):
         try:
             contents = self.loader.load_sources(sources)
         except RequestException as exc:
-            print 'ERROR: {}'.format(exc)
+            print('ERROR: {}'.format(exc))
         else:
             self.contents.update(contents)
     
@@ -384,14 +386,14 @@ class Program(object):
         '''
         Dumps the text representation of all content to the specified file.
         '''
-        utils.write_file(args[0], unicode(self.contents))
+        utils.write_file(args[0], str(self.contents))
 
     #---------------------------------------------------------------------------
     def cmd_dumps(self, args, kws):
         '''
         Print out the text representation of the content.
         '''
-        print unicode(self.contents)
+        print(str(self.contents))
     
     #---------------------------------------------------------------------------
     def cmd_end(self, args, kws):

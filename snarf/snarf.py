@@ -1,12 +1,18 @@
 # -*- coding:utf8 -*-
+from __future__ import unicode_literals
 import re
 import os
+import six
 import json
 from pprint import pformat
 import bs4 as beautiful_soup
 from . import utils
 from . import markup
 import strutil
+
+if six.PY2:
+    str = unicode
+
 
 verbose = utils.verbose
 is_string = strutil.is_string
@@ -60,13 +66,9 @@ class Bits(object):
 
     #---------------------------------------------------------------------------
     def serialize(self, format):
-        data = unicode(self._data)
-        return u"'''{}'''".format(data) if format == 'python' else data
+        data = str(self._data)
+        return "'''{}'''".format(data) if format == 'python' else data
 
-    #---------------------------------------------------------------------------
-    def __str__(self):
-        return unicode(self)
-    
     #---------------------------------------------------------------------------
     def __getattr__(self, attr):
         return getattr(self._data, attr)
@@ -89,24 +91,26 @@ class Bits(object):
 
 
 #===============================================================================
+@six.python_2_unicode_compatible
 class Text(Bits):
     '''
     Handler class for manipulating a block text.
     '''
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        self._data = unicode(data)
+        self._data = data
         
     #---------------------------------------------------------------------------
     def __iter__(self):
         return iter(self._data.splitlines())
         
     #---------------------------------------------------------------------------
-    def __unicode__(self):
+    def __str__(self):
         return self._data
 
 
 #===============================================================================
+@six.python_2_unicode_compatible
 class Soup(Bits):
     '''
     Handler for manipulating a block of HTML. A wrapper for ``BeautifulSoup``.
@@ -114,10 +118,10 @@ class Soup(Bits):
     
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        self._data = data if is_soup(data) else make_soup(unicode(data))
+        self._data = data if is_soup(data) else make_soup(str(data))
 
     #---------------------------------------------------------------------------
-    def __unicode__(self):
+    def __str__(self):
         return markup.format(self._data)
     
     #---------------------------------------------------------------------------
@@ -138,17 +142,18 @@ class Soup(Bits):
         return pformat(results)
 
 #===============================================================================
+@six.python_2_unicode_compatible
 class Lines(Bits):
     '''
     Handler class for manipulating and traversing lines of text.
     '''
     #---------------------------------------------------------------------------
     def __init__(self, data):
-        self._data = data[:] if is_lines(data) else unicode(data).splitlines()
+        self._data = data[:] if is_lines(data) else str(data).splitlines()
 
     #---------------------------------------------------------------------------
-    def __unicode__(self):
-        return u'\n'.join(self._data)
+    def __str__(self):
+        return '\n'.join(self._data)
 
     #---------------------------------------------------------------------------
     def serialize(self, format):
@@ -156,6 +161,7 @@ class Lines(Bits):
 
 
 #===============================================================================
+@six.python_2_unicode_compatible
 class Content(object):
 
     #---------------------------------------------------------------------------
@@ -167,8 +173,8 @@ class Content(object):
         return 'Content({})'.format(self._data.__class__.__name__)
     
     #---------------------------------------------------------------------------
-    def __unicode__(self):
-        return unicode(self._data)
+    def __str__(self):
+        return str(self._data)
     
     #---------------------------------------------------------------------------
     def __iter__(self):
@@ -176,15 +182,15 @@ class Content(object):
     
     #---------------------------------------------------------------------------
     def text(self):
-        return unicode(self._data)
+        return str(self)
     
     #---------------------------------------------------------------------------
     def lines(self):
-        return unicode(self._data).splitlines()
+        return str(self).splitlines()
     
     #---------------------------------------------------------------------------
     def soup(self):
-        return make_soup(unicode(self._data))
+        return make_soup(str(self))
     
     #---------------------------------------------------------------------------
     def remove_each(self, items, **kws):
@@ -267,7 +273,7 @@ class Content(object):
     #---------------------------------------------------------------------------
     def serialize(self, format='python', variable='data'):
         if format == 'python':
-            text = u'{} = {}'.format(variable, self._data.serialize(format))
+            text = '{} = {}'.format(variable, self._data.serialize(format))
         elif format == 'json':
             text = json.dumps(self._data.serialize(format))
         else:
@@ -325,6 +331,7 @@ class Content(object):
 
 
 #===============================================================================
+@six.python_2_unicode_compatible
 class Contents(object):
     
     #---------------------------------------------------------------------------
@@ -341,9 +348,8 @@ class Contents(object):
         return len(self.contents)
     
     #---------------------------------------------------------------------------
-    def __unicode__(self):
-        bits = [unicode(c) for c in self]
-        return '\n'.join(bits)
+    def __str__(self):
+        return '\n'.join([str(c) for c in self])
     
     #---------------------------------------------------------------------------
     def __getitem__(self, index):
@@ -387,7 +393,7 @@ class Contents(object):
                 for ct in self.contents:
                     data.contents.extend(ct._data.body())
             else:
-                data = '\n'.join(unicode(ct) for ct in self.contents)
+                data = str(self)
         
         return data
     

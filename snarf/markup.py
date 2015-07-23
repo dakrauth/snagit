@@ -1,4 +1,6 @@
+from __future__ import unicode_literals
 import bs4
+from six import u as text
 
 BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
 NON_CLOSING = 'hr br link meta img base input param source'.split()
@@ -20,15 +22,15 @@ def format_element(el, lines, depth=0, prefix='    '):
     if isinstance(el, bs4.NavigableString):
         el = el.strip()
         if el:
-            lines.append(u'{}{}'.format(indent, el))
+            lines.append('{}{}'.format(indent, el))
         return lines
         
     
-    line = u'{}<{}'.format(indent, el.name)
+    line = '{}<{}'.format(indent, el.name)
     for k, v in get_attrs(el).items():
-        line += u' {}="{}"'.format(k, v)
+        line += ' {}="{}"'.format(k, v)
     
-    line += u'>'
+    line += '>'
     if el.name in NON_CLOSING:
         lines.append(line)
         return lines
@@ -40,11 +42,11 @@ def format_element(el, lines, depth=0, prefix='    '):
             for ct in el.contents:
                 ct_depth = depth if ct.name in NO_INDENT else depth + 1
                 lines = format_element(ct, lines, ct_depth, prefix)
-            lines.append(u'{}</{}>'.format(indent, el.name))
+            lines.append('{}</{}>'.format(indent, el.name))
         else:
-            lines.append(u'{}{}</{}>'.format(line, el.contents[0].strip(), el.name))
+            lines.append('{}{}</{}>'.format(line, el.contents[0].strip(), el.name))
     else:
-        lines.append(u'{}</{}>'.format(line, el.name))
+        lines.append('{}</{}>'.format(line, el.name))
     
     return lines
 
@@ -55,11 +57,11 @@ def format(el, depth=0, prefix='    ', doctype=True):
     if isinstance(el, bs4.BeautifulSoup) and el.contents:
         first = el.contents[0]
         if isinstance(first, bs4.Doctype):
-            lines.append(unicode(first.output_ready()).strip())
+            lines.append(text(first.output_ready()).strip())
             start = 1
 
     for child in el.contents[start:]:
         lines = format_element(child, lines, depth, prefix)
 
     # from pprint import pprint; pprint(lines)
-    return u'\n'.join(lines)
+    return '\n'.join(lines)

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
+from __future__ import unicode_literals
 import re
 import os, sys
 import argparse
 from datetime import datetime
 from . import utils, script
 from .loader import Loader
-verbose = utils.verbose
 
+verbose = utils.verbose
 
 #-------------------------------------------------------------------------------
 def parse_args(args=None):
@@ -58,8 +59,8 @@ def run_program(prog_args=None):
         contents = prog.repl()
     
     if contents and args.output:
-        data = '\n'.join([unicode(c) for c in contents])
-        verbose('Writing {} bytes', len(data))
+        data = str(contents)
+        verbose('Writing {} chars', len(data))
         if args.output == '-':
             sys.stdout.write(data.encode('utf8') + '\n')
         else:

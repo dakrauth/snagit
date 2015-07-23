@@ -1,9 +1,10 @@
+from __future__ import unicode_literals
 import re
 import shutil
-from os.path import join, dirname, exists
+from os.path import join, dirname, exists, expanduser
 import sys
 import unittest
-from snarf.snarf import Contents, BeautifulSoup
+from snarf.snarf import Contents, make_soup
 from snarf import script
 from snarf import utils
 from snarf.loader import Loader
@@ -39,19 +40,19 @@ class TestLines(unittest.TestCase):
 
         lines.strip()
         text = unicode(lines)
-        self.assertMultiLineEqual(text, u'''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456''')
+        self.assertMultiLineEqual(text, '''foo bar baz\nspam\nxxxxxxxx\nzzzz\n123\nu6ejtryn\n456''')
     
         lines.skip_to('123', False)
         text = unicode(lines)
-        self.assertMultiLineEqual(text, u'u6ejtryn\n456')
+        self.assertMultiLineEqual(text, 'u6ejtryn\n456')
     
         lines.read_until('456', False)
         text = unicode(lines)
-        self.assertEqual(text, u'u6ejtryn')
+        self.assertEqual(text, 'u6ejtryn')
     
         lines.end()
         text = unicode(lines)
-        self.assertMultiLineEqual(text, u'u6ejtryn\n456')
+        self.assertMultiLineEqual(text, 'u6ejtryn\n456')
 
 
 #===============================================================================
@@ -113,7 +114,7 @@ class TestHTML(unittest.TestCase):
     
     #---------------------------------------------------------------------------
     def test_select_attr(self):
-        bs = BeautifulSoup(self.data)
+        bs = make_soup(self.data)
         h = Contents([bs])
         h.select_attr('a', 'href')
         lines = h.data_merge()
@@ -121,7 +122,7 @@ class TestHTML(unittest.TestCase):
 
     #---------------------------------------------------------------------------
     def test_dumps(self):
-        bs = BeautifulSoup(self.data)
+        bs = make_soup(self.data)
         h = Contents([bs])
         text = unicode(h)
         self.assertMultiLineEqual(text, read_test_data('expected_httpbin_links.html'))
@@ -138,7 +139,7 @@ class TestLoader(unittest.TestCase):
     def tearDown(self):
         if exists(self.snarf_dir):
             # probably overly excessive sanity here
-            start = os.path.expanduser('~')
+            start = expanduser('~')
             if self.snarf_dir.startswith(start):
                 shutil.rmtree(self.snarf_dir)
             else:

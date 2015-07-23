@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import os
 import atexit
 from urlparse import urlparse, ParseResult
@@ -135,7 +136,7 @@ class Loader(object):
                 if not os.path.exists(dirname):
                     os.makedirs(dirname)
                 
-                utils.write_file(filename, u'<!-- From: {} -->\n{}'.format(url, data))
+                utils.write_file(filename, '<!-- From: {} -->\n{}'.format(url, data))
         
         return data
 
