@@ -33,6 +33,6 @@ setup(
     packages=['snarf'],
     install_requires=['requests', 'beautifulsoup4', 'strutil'],
     entry_points = {
-        'console_scripts': ['snarf = snarf.main:main']
+        'console_scripts': ['snarf = snarf.__main__:main']
     }
 )

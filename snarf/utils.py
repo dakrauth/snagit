@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 import re
 import os
-import six
 import codecs
 import random
 import logging
@@ -21,7 +20,13 @@ try:
 except ImportError:
     import pdb
 
+
+
 DEFAULT_CONFIG = {
+    'cache_home': os.environ.get('XDG_CACHE_HOME', os.path.join(
+        os.path.expanduser('~'),
+        '.cache'
+    )),
     'range_delimiter': '{}',
     'user_agents': (
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
@@ -30,6 +35,9 @@ DEFAULT_CONFIG = {
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
         'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
     ),
+    'bad_attrs': 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split(),
+    'non_closing_tags': 'hr br link meta img base input param source'.split(),
+    'no_indent_tags': 'body head tr'.split(),
     'debug_logging': {
         'version': 1,
         'formatters': { 'snarf': {
@@ -87,7 +95,10 @@ def read_url(url):
     Returns a 2-tuple of (text, content_type)
     '''
     ua = get_config('user_agents')
-    headers = {'User-Agent': random.choice(ua)} if ua else None
+    headers = {'accept-language': 'en-US,en'}
+    if ua:
+        headers['User-Agent'] = random.choice(ua)
+    
     r = requests.get(url, headers=headers)
     if not r.ok:
         raise requests.HTTPError('URL {}: {}'.format(r.reason, url))

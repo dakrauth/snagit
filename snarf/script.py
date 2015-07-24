@@ -1,4 +1,4 @@
-from __future__ import unicode_literals
+from __future__ import unicode_literals, print_function
 import os
 import re
 import sys
@@ -11,7 +11,7 @@ from requests.exceptions import RequestException
 from prompt_toolkit.shortcuts import get_input
 import strutil
 from . import utils
-from . import snarf
+from . import core
 from .loader import Loader
 
 verbose = utils.verbose
@@ -30,10 +30,15 @@ def escaped(txt):
 #-------------------------------------------------------------------------------
 def get_doc(method, indent='    '):
     doc = method.__doc__
-    return '' if not doc else '\n'.join([
+    return '' if not doc else join(
         '{}{}'.format(indent, line.strip())
         for line in doc.splitlines()
-    ])
+    )
+
+
+#-------------------------------------------------------------------------------
+def join(args, joiner='\n'):
+    return joiner.join(args)
 
 
 #===============================================================================
@@ -202,7 +207,7 @@ class Program(object):
     #---------------------------------------------------------------------------
     def __init__(self, code='', contents=None, loader=None, use_cache=False, do_pm=False):
         self.loader = loader if loader else Loader(use_cache)
-        self.contents = snarf.Contents(contents)
+        self.contents = core.Contents(contents)
         self.do_break = False
         self.do_pm = do_pm
         self.script = Script(code)
@@ -240,7 +245,7 @@ class Program(object):
                 self.execute(instrs)
             except ProgramWarning as why:
                 print(why)
-        print('\n')
+
         return self.contents
     
     #---------------------------------------------------------------------------
@@ -301,7 +306,7 @@ class Program(object):
         '''
         List all lines of source code if not empty.
         '''
-        print('\n'.join(self.script.listing()))
+        print(join(self.script.listing()))
     
     #---------------------------------------------------------------------------
     def cmd_help(self, args, kws):
@@ -312,15 +317,18 @@ class Program(object):
         fmt = ' - ({})'.format
         if not args:
             print('Commands:')
-            print('\n'.join(['    {}{}'.format(s,fmt(k) if k else '') for s,n,m,k,d in cmds]))
+            print(join('    {}{}'.format(s,fmt(k) if k else '') for s,n,m,k,d in cmds))
         else:
+            output = []
             for cmd, method_name, method, kind, docstr in cmds:
                 if kind:
                     cmd += fmt(kind)
 
-                print(cmd)
+                output.append(cmd)
                 if docstr:
-                    print(docstr)
+                    output.append(docstr)
+                
+                print(join(output))
     
     #---------------------------------------------------------------------------
     def cmd_combine(self, args, kws):
@@ -516,7 +524,7 @@ class Program(object):
         '''
         Whittle down elements to those matching the CSS selection.
         '''
-        self.contents.select(args[0])
+        self.contents.select(args[0], limit=kws.get('limit'))
 
     #---------------------------------------------------------------------------
     @html_handler

@@ -18,11 +18,6 @@ from . import utils
 
 verbose = utils.verbose
 
-CACHE_HOME = os.environ.get('XDG_CACHE_HOME', os.path.join(
-    os.path.expanduser('~'),
-    '.cache'
-))
-
 
 #-------------------------------------------------------------------------------
 def makedirs(pth):
@@ -60,7 +55,8 @@ class Loader(object):
     '''
     
     #---------------------------------------------------------------------------
-    def __init__(self, use_cache=False, cache_base=CACHE_HOME, directory='snarf'):
+    def __init__(self, use_cache=False, cache_base=None, directory='snarf'):
+        cache_base = cache_base or utils.get_config('cache_home')
         self.snarf_dir = os.path.join(utils.absolute_filename(cache_base), directory)
         self.cache_dir = os.path.join(self.snarf_dir, 'cache')
         self.use_cache = use_cache

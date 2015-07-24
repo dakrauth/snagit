@@ -8,16 +8,11 @@ from pprint import pformat
 import bs4 as beautiful_soup
 from . import utils
 from . import markup
+from .compat import str
 import strutil
-
-if six.PY2:
-    str = unicode
-
 
 verbose = utils.verbose
 is_string = strutil.is_string
-
-BAD_ATTRS = 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split()
 
 
 #-------------------------------------------------------------------------------
@@ -164,6 +159,8 @@ class Lines(Bits):
 @six.python_2_unicode_compatible
 class Content(object):
 
+    bad_attrs = utils.get_config('bad_attrs')
+    
     #---------------------------------------------------------------------------
     def __init__(self, data='', guess=False):
         self._data = Bits.create(data, guess)
@@ -238,8 +235,8 @@ class Content(object):
         return Content(soup)
         
     #---------------------------------------------------------------------------
-    def select(self, query):
-        results = self.soup().select(query)
+    def select(self, query, limit=None):
+        results = self.soup().select(query, limit=limit)
         verbose('Selected {} matches', len(results))
         return Content(beautiful_results(results)) if results else self
 
@@ -259,7 +256,7 @@ class Content(object):
         if is_string(attrs):
             attrs = attrs if attrs == '*' else attrs.split(',')
 
-        attrs = attrs or BAD_ATTRS
+        attrs = attrs or self.bad_attrs
         soup = self.soup()
         for el in soup.descendants:
             if hasattr(el, 'attrs'):

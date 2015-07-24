@@ -1,22 +1,27 @@
 #!/usr/bin/env python
-from __future__ import unicode_literals
+'''
+Capture, filter, and extract data from the interwebs
+'''
+from __future__ import unicode_literals, print_function
 import re
-import os, sys
+import sys
 import argparse
 from datetime import datetime
-from . import utils, script
+from . import utils, script, get_version
 from .loader import Loader
 
 verbose = utils.verbose
 
 #-------------------------------------------------------------------------------
 def parse_args(args=None):
-    parser = argparse.ArgumentParser(description='Capture, filter, and extract some text')
+    parser = argparse.ArgumentParser(prog='snarf', description=__doc__)
     parser.add_argument('source', nargs='*')
     parser.add_argument('-C', '--cache', action='store_true',
         help='for URLs, create or use a local cache of the content')
     parser.add_argument('-v', '--verbose', action='store_true',
         help='increase output verbosity')
+    parser.add_argument('-V', '--version', action='store_true',
+        help='show version and exit')
     parser.add_argument('--pdb', action='store_true',
         help='use ipdb or pdb to debug')
     parser.add_argument('--pm', action='store_true',
@@ -30,24 +35,25 @@ def parse_args(args=None):
     parser.add_argument('-i', '--repl', action='store_true',
         help='Enter interactive (REPL) script mode')
     
-    return parser.parse_args(args)
+    return parser, parser.parse_args(args)
 
 
 #-------------------------------------------------------------------------------
 def run_program(prog_args=None):
-    args = parse_args(prog_args)
+    parser, args = parse_args(prog_args)
     start = datetime.now()
     if args.pdb:
         utils.pdb.set_trace()
-        
+    
     if args.verbose:
         utils.enable_debug_logger()
+        verbose('{}', vars(args))
     
-    verbose('{}', args)
-    loader = Loader()
-    if args.cache:
-        loader.use_cache = True
+    if args.version:
+        print('{} - v{}'.format(parser.prog, get_version()))
+        sys.exit(0)
     
+    loader = Loader(use_cache=args.cache)
     sources = utils.expand_range_set(args.source, args.range_set)
     contents = loader.load_sources(sources)
     code = utils.read_file(args.script) if args.script else ''
