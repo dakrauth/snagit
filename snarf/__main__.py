@@ -16,7 +16,7 @@ verbose = utils.verbose
 def parse_args(args=None):
     parser = argparse.ArgumentParser(prog='snarf', description=__doc__)
     parser.add_argument('source', nargs='*')
-    parser.add_argument('-C', '--cache', action='store_true',
+    parser.add_argument('-c', '--cache', action='store_true',
         help='for URLs, create or use a local cache of the content')
     parser.add_argument('-v', '--verbose', action='store_true',
         help='increase output verbosity')
