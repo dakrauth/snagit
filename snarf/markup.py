@@ -19,6 +19,16 @@ class Formatter(object):
             for key, values in orig.items()
         }
 
+    #---------------------------------------------------------------------------
+    def format_attrs(self, el):
+        attrs = ''
+        orig = getattr(el, 'attrs', {}) or {}
+        if orig:
+            for key, vals in orig.items():
+                vals = ' '.join(vals) if isinstance(vals, (list, tuple)) else vals
+                attrs += ' {}="{}"'.format(key, vals)
+            
+        return attrs
 
     #---------------------------------------------------------------------------
     def format_element(self, el, lines, depth=0, prefix='    '):
@@ -29,16 +39,13 @@ class Formatter(object):
                 lines.append('{}{}'.format(indent, el))
             return lines
         
-    
-        line = '{}<{}'.format(indent, el.name)
-        for k, v in self.get_attrs(el).items():
-            line += ' {}="{}"'.format(k, v)
-    
-        line += '>'
+        line = '{}<{}{}>'.format(indent, el.name, self.format_attrs(el))
         if el.name in self.non_closing:
             lines.append(line)
+            for ct in el.contents:
+                lines = self.format_element(ct, lines, depth, prefix)
             return lines
-
+        
         n_children = len(el.contents)
         if n_children:
             if n_children > 1 or isinstance(el.contents[0], bs4.Tag):
@@ -57,14 +64,17 @@ class Formatter(object):
     #---------------------------------------------------------------------------
     def format(self, el, depth=0, prefix='    ', doctype=True):
         lines = []
-        start = 0
-        if isinstance(el, bs4.BeautifulSoup) and el.contents:
+        if not el and el.contents:
+            return ''
+        
+        contents = iter(el.contents)
+        if isinstance(el, bs4.BeautifulSoup):
             first = el.contents[0]
             if isinstance(first, bs4.Doctype):
                 lines.append(str(first.output_ready()).strip())
-                start = 1
+                next(contents)
 
-        for child in el.contents[start:]:
+        for child in contents:
             lines = self.format_element(child, lines, depth, prefix)
 
         # from pprint import pprint; pprint(lines)
@@ -79,4 +89,4 @@ def format(*args, **kws):
     if not _formatter:
         _formatter = Formatter()
         
-    _formatter.format(*args, **kws)
+    return _formatter.format(*args, **kws)

@@ -14,6 +14,11 @@ import strutil
 verbose = utils.verbose
 is_string = strutil.is_string
 
+try:
+    import html5lib
+    DEFAULT_BS4_FEATRUE = 'html5lib'
+except ImportError:
+    DEFAULT_BS4_FEATRUE = 'html.parser'
 
 #-------------------------------------------------------------------------------
 def is_lines(what):
@@ -31,8 +36,9 @@ def is_navigable_string(what):
 
 
 #-------------------------------------------------------------------------------
-def make_soup(markup=''):
-    return beautiful_soup.BeautifulSoup(markup, 'html.parser')
+def make_soup(markup='', feature=None):
+    feature = feature or DEFAULT_BS4_FEATRUE
+    return beautiful_soup.BeautifulSoup(markup, feature)
 
 
 #-------------------------------------------------------------------------------
