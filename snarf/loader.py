@@ -120,6 +120,8 @@ class Loader(object):
     #---------------------------------------------------------------------------
     @use_cache.setter
     def use_cache(self, value):
+        if value:
+            get_directory(self.cache_dir)
         self._use_cache = value
         
     #---------------------------------------------------------------------------
@@ -127,7 +129,7 @@ class Loader(object):
         if not readline:
             return
         
-        base = self.get_directory(self.snarf_dir)
+        base = get_directory(self.snarf_dir)
         histfile = os.path.join(base, filename)
         verbose('Reading history file: {}'.format(histfile))
         try:

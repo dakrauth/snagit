@@ -4,7 +4,7 @@ import shutil
 from os.path import join, dirname, exists, expanduser
 import sys
 import unittest
-from snarf.snarf import Contents, make_soup
+from snarf.core import Contents, make_soup
 from snarf import script
 from snarf import utils
 from snarf.loader import Loader
@@ -147,8 +147,10 @@ class TestLoader(unittest.TestCase):
         
     #---------------------------------------------------------------------------
     def test_cache_dir_creation(self):
+        #import pdb; pdb.set_trace()
         loader = Loader(use_cache=True, cache_base=self.snarf_dir)
-        self.assertEqual(loader.cache_dir, join(self.snarf_dir, 'snarf', 'cache'))
+        expected_cache_dir = join(self.snarf_dir, 'snarf', 'cache')
+        self.assertEqual(loader.cache_dir, expected_cache_dir)
         self.assertTrue(exists(loader.cache_dir))
 
 
