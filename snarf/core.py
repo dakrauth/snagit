@@ -1,17 +1,18 @@
 # -*- coding:utf8 -*-
-from __future__ import unicode_literals
 import re
 import os
 import six
 import json
+import logging
 from pprint import pformat
+
 import bs4 as beautiful_soup
-from . import utils
-from . import markup
-from .compat import str
 import strutil
 
-verbose = utils.verbose
+from . import utils
+from . import markup
+
+logger = logging.getLogger(__name__)
 is_string = strutil.is_string
 
 try:
@@ -20,28 +21,24 @@ try:
 except ImportError:
     DEFAULT_BS4_FEATRUE = 'html.parser'
 
-#-------------------------------------------------------------------------------
+
 def is_lines(what):
     return isinstance(what, (list, tuple))
 
 
-#-------------------------------------------------------------------------------
 def is_soup(what):
     return isinstance(what, (beautiful_soup.BeautifulSoup, beautiful_soup.PageElement))
 
 
-#-------------------------------------------------------------------------------
 def is_navigable_string(what):
     return isinstance(what, beautiful_soup.NavigableString)
 
 
-#-------------------------------------------------------------------------------
 def make_soup(markup='', feature=None):
     feature = feature or DEFAULT_BS4_FEATRUE
     return beautiful_soup.BeautifulSoup(markup, feature)
 
 
-#-------------------------------------------------------------------------------
 def beautiful_results(results):
     '''
     Convert a list of HTML elements back into a ``BeautifulSoup`` instance.
@@ -54,27 +51,21 @@ def beautiful_results(results):
     return soup
 
 
-#===============================================================================
-class Bits(object):
-    
-    #---------------------------------------------------------------------------
+class Bits:
+
     def __iter__(self):
         return iter(self._data)
 
-    #---------------------------------------------------------------------------
     def __len__(self):
         return len(self._data)
 
-    #---------------------------------------------------------------------------
     def serialize(self, format):
         data = str(self._data)
         return "'''{}'''".format(data) if format == 'python' else data
 
-    #---------------------------------------------------------------------------
     def __getattr__(self, attr):
         return getattr(self._data, attr)
 
-    #---------------------------------------------------------------------------
     @staticmethod
     def create(data, guess=False):
         if is_lines(data):
@@ -91,41 +82,32 @@ class Bits(object):
         raise ValueError('Cannot create data type, must be string or list')
 
 
-#===============================================================================
-@six.python_2_unicode_compatible
 class Text(Bits):
     '''
     Handler class for manipulating a block text.
     '''
-    #---------------------------------------------------------------------------
+
     def __init__(self, data):
         self._data = data
-        
-    #---------------------------------------------------------------------------
+
     def __iter__(self):
         return iter(self._data.splitlines())
-        
-    #---------------------------------------------------------------------------
+
     def __str__(self):
         return self._data
 
 
-#===============================================================================
-@six.python_2_unicode_compatible
 class Soup(Bits):
     '''
     Handler for manipulating a block of HTML. A wrapper for ``BeautifulSoup``.
     '''
-    
-    #---------------------------------------------------------------------------
+
     def __init__(self, data):
         self._data = data if is_soup(data) else make_soup(str(data))
 
-    #---------------------------------------------------------------------------
     def __str__(self):
         return markup.format(self._data)
-    
-    #---------------------------------------------------------------------------
+
     def serialize(self, format):
         results = []
         for item in self._data.findChildren(recursive=False):
@@ -142,68 +124,53 @@ class Soup(Bits):
 
         return pformat(results)
 
-#===============================================================================
-@six.python_2_unicode_compatible
+
 class Lines(Bits):
     '''
     Handler class for manipulating and traversing lines of text.
     '''
-    #---------------------------------------------------------------------------
+
     def __init__(self, data):
         self._data = data[:] if is_lines(data) else str(data).splitlines()
 
-    #---------------------------------------------------------------------------
     def __str__(self):
         return '\n'.join(self._data)
 
-    #---------------------------------------------------------------------------
     def serialize(self, format):
         return pformat(self._data)
 
 
-#===============================================================================
-@six.python_2_unicode_compatible
-class Content(object):
+class Content:
 
     bad_attrs = utils.get_config('bad_attrs')
-    
-    #---------------------------------------------------------------------------
+
     def __init__(self, data='', guess=False):
         self._data = Bits.create(data, guess)
-    
-    #---------------------------------------------------------------------------
+
     def __repr__(self):
         return 'Content({})'.format(self._data.__class__.__name__)
-    
-    #---------------------------------------------------------------------------
+
     def __str__(self):
         return str(self._data)
-    
-    #---------------------------------------------------------------------------
+
     def __iter__(self):
         return iter(self._data)
-    
-    #---------------------------------------------------------------------------
+
     def text(self):
         return str(self)
-    
-    #---------------------------------------------------------------------------
+
     def lines(self):
         return str(self).splitlines()
-    
-    #---------------------------------------------------------------------------
+
     def soup(self):
         return make_soup(str(self))
-    
-    #---------------------------------------------------------------------------
+
     def remove_each(self, items, **kws):
         return Content(strutil.remove_each(self.text(), items, **kws))
-    
-    #---------------------------------------------------------------------------
+
     def replace_each(self, items, **kws):
         return Content(strutil.replace_each(self.text(), items, **kws))
-    
-    #---------------------------------------------------------------------------
+
     def _call_cmd(self, cmd, args):
         if is_string(args):
             args = args.split(',')
@@ -215,38 +182,32 @@ class Content(object):
                 method()
                 
         return Content(soup)
-    
-    #---------------------------------------------------------------------------
+
     def unwrap(self, tags):
         return self._call_cmd('unwrap', tags)
-    
-    #---------------------------------------------------------------------------
+
     def unwrap_attr(self, query, attr):
         soup = self.soup()
         for el in soup.select(query):
             el.replace_with(getattr(el, 'attrs', {}).get(attr, ''))
             
         return Content(soup)
-        
-    #---------------------------------------------------------------------------
+
     def extract(self, tags):
         return self._call_cmd('extract', tags)
-    
-    #---------------------------------------------------------------------------
+
     def replace_with(self, query, what):
         soup = self.soup()
         for el in soup.select(query):
             el.replace_with(what)
         
         return Content(soup)
-        
-    #---------------------------------------------------------------------------
+
     def select(self, query, limit=None):
         results = self.soup().select(query, limit=limit)
-        verbose('Selected {} matches', len(results))
+        logger.debug('Selected {} matches', len(results))
         return Content(beautiful_results(results)) if results else self
 
-    #---------------------------------------------------------------------------
     def select_attr(self, query, attr, test=bool):
         results = []
         for el in self.soup().select(query):
@@ -257,7 +218,6 @@ class Content(object):
 
         return Content(results)
 
-    #---------------------------------------------------------------------------
     def remove_attrs(self, attrs=None):
         if is_string(attrs):
             attrs = attrs if attrs == '*' else attrs.split(',')
@@ -273,7 +233,6 @@ class Content(object):
         
         return Content(soup)
 
-    #---------------------------------------------------------------------------
     def serialize(self, format='python', variable='data'):
         if format == 'python':
             text = '{} = {}'.format(variable, self._data.serialize(format))
@@ -284,7 +243,6 @@ class Content(object):
             
         return Content(text)
 
-    #---------------------------------------------------------------------------
     def collapse(self, query, joiner=' '):
         soup = self.soup()
         for item in soup.select(query):
@@ -293,19 +251,15 @@ class Content(object):
             
         return Content(soup)
 
-    #---------------------------------------------------------------------------
     def format(self, fmt):
         return Content([fmt.format(l) for l in self.lines()])
-    
-    #---------------------------------------------------------------------------
+
     def compress(self):
         return Content([' '.join(l.strip().split()) for l in self.lines()])
-    
-    #---------------------------------------------------------------------------
+
     def strip(self):
         return Content([l.strip() for l in self.lines()])
-        
-    #---------------------------------------------------------------------------
+
     def skip_to(self, what, keep=True):
         lines = self.lines()
         found = strutil.find_first(lines, what)
@@ -316,8 +270,7 @@ class Content(object):
             return Content(lines[found:])
 
         return self
-        
-    #----------------------------------------------------------------------------
+
     def read_until(self, what, keep=True):
         lines = self.lines()
         found = strutil.find_first(lines, what)
@@ -329,47 +282,35 @@ class Content(object):
 
         return self
 
-    #---------------------------------------------------------------------------
     def matches(self, what):
         return Content([l for l in self.lines() if strutil.matches(l, what)])
 
+class Contents:
 
-#===============================================================================
-@six.python_2_unicode_compatible
-class Contents(object):
-    
-    #---------------------------------------------------------------------------
     def __init__(self, contents=None, guess=False):
         self.stack = []
         self.set_contents(contents, guess=guess)
-    
-    #---------------------------------------------------------------------------
+
     def __iter__(self):
         return iter(self.contents)
-    
-    #---------------------------------------------------------------------------
+
     def __len__(self):
         return len(self.contents)
-    
-    #---------------------------------------------------------------------------
+
     def __str__(self):
         return '\n'.join([str(c) for c in self])
-    
-    #---------------------------------------------------------------------------
+
     def __getitem__(self, index):
         return self.contents[index]
-    
-    #---------------------------------------------------------------------------
+
     def end(self):
         self.contents = self.stack.pop()
-    
-    #---------------------------------------------------------------------------
+
     def update(self, contents):
         if self.contents:
             self.stack.append(self.contents)
         self.set_contents(contents)
-    
-    #---------------------------------------------------------------------------
+
     def __getattr__(self, attr):
         if not hasattr(Content, attr):
             raise AttributeError('Unknown attribute "{}"'.format(attr))
@@ -383,7 +324,6 @@ class Contents(object):
             self.update(contents)
         return handler
 
-    #---------------------------------------------------------------------------
     def data_merge(self):
         data = None
         if self.contents:
@@ -400,8 +340,7 @@ class Contents(object):
                 data = str(self)
         
         return data
-    
-    #---------------------------------------------------------------------------
+
     def combine(self):
         '''
         Distill contents into a single piece of content.
@@ -409,8 +348,7 @@ class Contents(object):
         if self.contents:
             data = self.data_merge()
             self.update([Content(data)])
-        
-    #---------------------------------------------------------------------------
+
     def set_contents(self, contents, guess=False):
         self.contents = []
         if contents:

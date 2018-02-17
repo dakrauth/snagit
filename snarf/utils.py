@@ -1,14 +1,14 @@
-from __future__ import unicode_literals
 import re
 import os
 import codecs
 import random
 import logging
-from copy import deepcopy
-from logging.config import dictConfig
 import mimetypes
 import itertools
+from copy import deepcopy
 from strutil import is_string, is_regex
+
+logger = logging.getLogger(__name__)
 
 try:
     import requests
@@ -20,7 +20,31 @@ try:
 except ImportError:
     import pdb
 
+GLOBAL_ATTRS = ['class',  'id', 'style']
+BAD_ATTRS = [
+    'align', 'alink', 'background', 'bgcolor', 'border', 'clear', 'height',
+    'hspace', 'language', 'link', 'nowrap', 'start', 'text', 'type', 'vlink',
+    'vspace', 'width'
+]
 
+BAD_TAGS = {
+    'applet': None,
+    'basefont': None,
+    'center': 'span',
+    'dir': 'ul',
+    'embed': 'object',
+    'font': 'span',
+    'isindex': None,
+    'listing': 'pre',
+    'marquee': 'p',
+    'menu': 'ul',
+    'plaintext': 'pre',
+    's': 'span',
+    'strike': 'span',
+    'tt': 'code',
+    'u': 'span',
+    'xmp': 'pre',
+}
 
 DEFAULT_CONFIG = {
     'cache_home': os.environ.get('XDG_CACHE_HOME', os.path.join(
@@ -38,29 +62,11 @@ DEFAULT_CONFIG = {
     'bad_attrs': 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split(),
     'non_closing_tags': 'hr br link meta img base input param source'.split(),
     'no_indent_tags': 'body head tr'.split(),
-    'debug_logging': {
-        'version': 1,
-        'formatters': { 'snarf': {
-            'format': '%(asctime)s:%(name)s:%(levelname)s: %(message)s',
-            'datefmt': '%Y-%m-%d %H:%M:%S'
-        }},
-        'handlers': { 'snarf': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'snarf',
-            'level': logging.DEBUG
-        }},
-        'loggers': { 'snarf': { 'handlers': ['snarf'], 'level': logging.DEBUG }}
-    }
 }
-
-
-logger = logging.getLogger('snarf')
-logger.addHandler(logging.NullHandler())
-
 
 _config_settings = deepcopy(DEFAULT_CONFIG)
 
-#-------------------------------------------------------------------------------
+
 def set_config(**kws):
     global _config_settings
     new_config = deepcopy(_config_settings)
@@ -69,12 +75,10 @@ def set_config(**kws):
     return new_config
 
 
-#-------------------------------------------------------------------------------
 def get_config(key=None, default=None):
     return _config_settings.get(key, default) if key else _config_settings
 
 
-#-------------------------------------------------------------------------------
 def guess_extension(content_type):
     if ';' in content_type:
         content_type = content_type.split(';')[0]
@@ -87,7 +91,6 @@ def guess_extension(content_type):
     return ext or ''
 
 
-#---------------------------------------------------------------------------
 def read_url(url):
     '''
     Read data from ``url``.
@@ -107,7 +110,6 @@ def read_url(url):
     return (r.text, ct)
 
 
-#-------------------------------------------------------------------------------
 def seq(what):
     '''
     Make a ``list``-like sequence of ``what``.
@@ -117,23 +119,6 @@ def seq(what):
     return [what] if is_string(what) else what
 
 
-#-------------------------------------------------------------------------------
-def enable_debug_logger(enable=True):
-    if enable:
-        config = get_config('debug_logging')
-        if config:
-            dictConfig(config)
-        logger.disabled = 0
-    else:
-        logger.disabled = 1
-
-
-#-------------------------------------------------------------------------------
-def verbose(fmt, *args):
-    logger.debug(fmt.format(*args))
-
-
-#-------------------------------------------------------------------------------
 def absolute_filename(filename):
     '''
     Do all those annoying things to arrive at a real absolute path.
@@ -145,7 +130,6 @@ def absolute_filename(filename):
     )
 
 
-#-------------------------------------------------------------------------------
 def write_file(filename, data, mode='w', encoding='utf8'):
     '''
     Write ``data`` to properly encoded file.
@@ -155,7 +139,6 @@ def write_file(filename, data, mode='w', encoding='utf8'):
         fp.write(data)
 
 
-#-------------------------------------------------------------------------------
 def read_file(filename, encoding='utf8'):
     '''
     Read ``data`` from properly encoded file.
@@ -165,17 +148,15 @@ def read_file(filename, encoding='utf8'):
         return fp.read()
 
 
-#-------------------------------------------------------------------------------
 def flatten(lists):
     '''
     Single-level conversion of things to an iterable.
     '''
     return itertools.chain(*lists)
 
-
 range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
 
-#-------------------------------------------------------------------------------
+
 def _get_range_run(start, end):
     if start.isdigit():
         fmt = '{}'
@@ -186,7 +167,6 @@ def _get_range_run(start, end):
     return [chr(c) for c in range(ord(start), ord(end) + 1)]
 
 
-#-------------------------------------------------------------------------------
 def get_range_set(text):
     '''
     Convert a string of range-like tokens into list of characters.
@@ -212,7 +192,6 @@ def get_range_set(text):
     return values
 
 
-#-------------------------------------------------------------------------------
 def expand_range_set(sources, range_set=None):
     if is_string(sources):
         sources = [sources]
@@ -227,5 +206,4 @@ def expand_range_set(sources, range_set=None):
         results.extend([src.replace(delim, c) for c in chars])
     
     return results
-
 

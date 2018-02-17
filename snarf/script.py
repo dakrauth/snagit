@@ -1,24 +1,29 @@
-from __future__ import unicode_literals, print_function
 import os
 import re
 import sys
 import json
+import logging
 import inspect
 import functools
 import traceback
 from pprint import pformat
 from requests.exceptions import RequestException
-from prompt_toolkit.shortcuts import get_input
+
+try:
+    from prompt_toolkit.shortcuts import get_input
+except ImportError:
+    get_input = input
+    
 import strutil
 from . import utils
 from . import core
 from .loader import Loader
 
-verbose = utils.verbose
 set_trace = utils.pdb.set_trace
 post_mortem = utils.pdb.post_mortem
+logger = logging.getLogger(__name__)
 
-#-------------------------------------------------------------------------------
+
 def escaped(txt):
     for cin, cout in (
         ('\\n', '\n'),
@@ -27,7 +32,7 @@ def escaped(txt):
         txt = txt.replace(cin, cout)
     return txt
 
-#-------------------------------------------------------------------------------
+
 def get_doc(method, indent='    '):
     doc = method.__doc__
     return '' if not doc else join(
@@ -36,13 +41,10 @@ def get_doc(method, indent='    '):
     )
 
 
-#-------------------------------------------------------------------------------
 def join(args, joiner='\n'):
     return joiner.join(args)
 
-
-#===============================================================================
-class Instruction(object):
+class Instruction:
     '''
     ``Instruction``'s take the form::
     
@@ -61,17 +63,14 @@ class Instruction(object):
 
     args_re = re.compile(r'^((?P<kwd>\w+)=(?P<val>%s)|(?P<arg>%s))\s*' % (values_pat, values_pat), re.VERBOSE)
     value_dict = {'True': True, 'False': False, 'None': None}
-    
-    #---------------------------------------------------------------------------
+
     def __repr__(self):
         return '<Instruction({}): {}, {}>'.format(self.cmd, self.args, self.kws)
-    
-    #---------------------------------------------------------------------------
+
     def __init__(self, program, line, lineno):
         self.lineno = lineno
         self.parse(line)
-        
-    #----------------------------------------------------------------------------
+
     def get_value(self, s):
         if s.isdigit():
             return int(s)
@@ -84,7 +83,6 @@ class Instruction(object):
         else:
             return s.strip()
 
-    #---------------------------------------------------------------------------
     def parse(self, text):
         self.args = []
         self.kws = {}
@@ -113,15 +111,12 @@ class Instruction(object):
         if text:
             raise SyntaxError('Syntax error: "{}" (line {})'.format(text, self.lineno))
 
-
-#===============================================================================
-class Script(object):
+class Script:
     '''
     ``Script`` takes the script source code, scans it, and compiles it into
     ``Instructions``
     '''
-    
-    #---------------------------------------------------------------------------
+
     def __init__(self, code=''):
         self.lineno = 1
         self.code = ''
@@ -129,12 +124,10 @@ class Script(object):
         self.instructions = []
         if code:
             self.compile(code)
-    
-    #---------------------------------------------------------------------------
+
     def listing(self):
         return [line for line in self.code.splitlines() if line]
-        
-    #---------------------------------------------------------------------------
+
     def compile(self, code):
         self.code += '\n' + code if self.code else code
         
@@ -145,8 +138,7 @@ class Script(object):
         self.instructions += instructions
         
         return instructions
-    
-    #----------------------------------------------------------------------------
+
     def scan(self, text):
         lines = []
         for line in text.splitlines():
@@ -156,36 +148,29 @@ class Script(object):
             lines.append((line, self.lineno))
             self.lineno += 1
             
-        verbose('Scanned {} lines from {} bytes', len(lines), len(text))
+        logger.debug('Scanned {} lines from {} bytes', len(lines), len(text))
         return lines
 
-    #---------------------------------------------------------------------------
     def parse_instruction(self, line, lineno):
         bits = line.split(' ', 1)
         cmd = bits.pop(0)
         if bits:
             args, kws, remnants = self.parse_command_inputs(bits[1])
             if remnants:
-                verbose('Line {} input remnant: {}', lineno, remnants)
+                logger.debug('Line {} input remnant: {}', lineno, remnants)
             return (cmd, args, kws, lineno)
         return (cmd, (), {}, lineno)
 
-    #---------------------------------------------------------------------------
     def parse(self, lines):
         return [Instruction(self, l, n) for l, n in lines]
 
-
-#===============================================================================
 class ProgramWarning(Exception):
     '''A program warning occurred.'''
 
-
-#===============================================================================
 class ProgramError(Exception):
     '''A program error occurred.'''
 
 
-#-------------------------------------------------------------------------------
 def register_handler(kind):
     '''
     Create a decorator for the given ``Bits``-derived content handler.
@@ -195,32 +180,25 @@ def register_handler(kind):
         return method
     return decorator
 
-
 html_handler = register_handler('Soup')
 text_handler = register_handler('Text')
 line_handler = register_handler('Lines')
 
+class Program:
 
-#===============================================================================
-class Program(object):
-    
-    #---------------------------------------------------------------------------
     def __init__(self, code='', contents=None, loader=None, use_cache=False, do_pm=False):
         self.loader = loader if loader else Loader(use_cache)
         self.contents = core.Contents(contents)
         self.do_break = False
         self.do_pm = do_pm
         self.script = Script(code)
-        
-    #---------------------------------------------------------------------------
+
     def _get_command(self, cmd):
         return getattr(self, 'cmd_' + cmd, None)
-    
-    #---------------------------------------------------------------------------
+
     def get_input(self, prompt='> '):
         return get_input(prompt).strip()
-    
-    #---------------------------------------------------------------------------
+
     def repl(self):
         self.loader.load_history()
         print('Type "help" for more information. Ctrl+c to exit')
@@ -247,8 +225,7 @@ class Program(object):
                 print(why)
 
         return self.contents
-    
-    #---------------------------------------------------------------------------
+
     def _get_commands(self, subset=None):
         cmds = []
         for s in dir(self):
@@ -258,10 +235,9 @@ class Program(object):
                     m = getattr(self, s)
                     cmds.append((cmd, s, m, getattr(m, 'kind', None), get_doc(m)))
         return cmds
-    
-    #---------------------------------------------------------------------------
+
     def _exec(self, instr):
-        verbose('Executing {}', instr.cmd)
+        logger.debug('Executing {}', instr.cmd)
         method = self._get_command(instr.cmd)
         if method is None:
             raise ProgramWarning('Unknown script instr (line {}): {}'.format(
@@ -283,32 +259,28 @@ class Program(object):
             else:
                 print(traceback.print_exc())
             raise ProgramError('Line {}: {}'.format(instr.lineno, value))
-    
-    #---------------------------------------------------------------------------
+
     def execute(self, instructions=None):
         instructions = instructions or self.script.instructions
         for instr in instructions:
             self._exec(instr)
         
         return self.contents
-    
-    #---------------------------------------------------------------------------
-    def cmd_verbose(self, args, kws):
+
+    def cmd_logger(self, args, kws):
         '''
         Enable verbosity.
         '''
         enable = args[0] if args else True
         utils.enable_debug_logger(enable)
-        verbose('Verbose logging {}'.format('enabled' if enable else 'disabled'))
-    
-    #---------------------------------------------------------------------------
+        logger.debug('Verbose logging {}'.format('enabled' if enable else 'disabled'))
+
     def cmd_list(self, args, kws):
         '''
         List all lines of source code if not empty.
         '''
         print(join(self.script.listing()))
-    
-    #---------------------------------------------------------------------------
+
     def cmd_help(self, args, kws):
         '''
         Display help on available commands.
@@ -329,15 +301,13 @@ class Program(object):
                     output.append(docstr)
                 
                 print(join(output))
-    
-    #---------------------------------------------------------------------------
+
     def cmd_combine(self, args, kws):
         '''
         Combine all contents into a single content.
         '''
         self.contents.combine()
-    
-    #---------------------------------------------------------------------------
+
     def cmd_serialize(self, args, kws):
         '''
         Serialize content data into either 'python' or 'json'.
@@ -345,15 +315,13 @@ class Program(object):
         self.cmd_combine((), {})
         content = self.contents[0]
         content.serialize(**kws)
-    
-    #---------------------------------------------------------------------------
+
     def cmd_cache(self, args, kws):
         '''
         Enable caching.
         '''
         self.loader.use_cache = True
-    
-    #---------------------------------------------------------------------------
+
     def cmd_load(self, args, kws):
         '''
         Load new resource(s).
@@ -366,8 +334,7 @@ class Program(object):
             print('ERROR: {}'.format(exc))
         else:
             self.contents.update(contents)
-    
-    #---------------------------------------------------------------------------
+
     def cmd_load_all(self, args, kws):
         '''
         Load new resource(s) from current content contents array.
@@ -377,41 +344,33 @@ class Program(object):
             sources.extend(list(content))
         
         self.cmd_load(sources, kws)
-    
-    #---------------------------------------------------------------------------
+
     def cmd_break(self, args, kws):
         '''
         Enable a debugging breakpoint.
         '''
         self.do_break = True
-    
-    #---------------------------------------------------------------------------
+
     def cmd_echo(self, args, kws):
-        verbose('>>> {}', args)
-    
-    #---------------------------------------------------------------------------
+        logger.debug('>>> {}', args)
+
     def cmd_write(self, args, kws):
         '''
         Dumps the text representation of all content to the specified file.
         '''
         utils.write_file(args[0], str(self.contents))
 
-    #---------------------------------------------------------------------------
     def cmd_dumps(self, args, kws):
         '''
         Print out the text representation of the content.
         '''
         print(str(self.contents))
-    
-    #---------------------------------------------------------------------------
+
     def cmd_end(self, args, kws):
         self.contents.end()
 
-    #---------------------------------------------------------------------------
     # Lines methods
-    #---------------------------------------------------------------------------
 
-    #---------------------------------------------------------------------------
     @line_handler
     def cmd_skip_to(self, args, kws):
         '''
@@ -419,7 +378,7 @@ class Program(object):
         '''
         self.contents.skip_to(args[0], **kws)
     
-    #---------------------------------------------------------------------------
+
     @line_handler
     def cmd_read_until(self, args, kws):
         '''
@@ -427,7 +386,6 @@ class Program(object):
         '''
         self.contents.read_until(args[0], **kws)
 
-    #---------------------------------------------------------------------------
     @line_handler
     def cmd_strip(self, args, kws):
         '''
@@ -435,7 +393,7 @@ class Program(object):
         '''
         self.contents.strip()
     
-    #---------------------------------------------------------------------------
+
     @line_handler
     def cmd_matches(self, args, kws):
         '''
@@ -443,7 +401,7 @@ class Program(object):
         '''
         self.contents.matches(args[0], **kws)
     
-    #---------------------------------------------------------------------------
+
     @line_handler
     def cmd_compress(self, args, kws):
         '''
@@ -451,7 +409,6 @@ class Program(object):
         '''
         self.contents.compress()
 
-    #---------------------------------------------------------------------------
     @line_handler
     def cmd_format(self, args, kws):
         '''
@@ -459,11 +416,9 @@ class Program(object):
         '''
         self.contents.format(args[0])
     
-    #---------------------------------------------------------------------------
-    # Text methods
-    #---------------------------------------------------------------------------
 
-    #---------------------------------------------------------------------------
+    # Text methods
+
     @text_handler
     def cmd_remove(self, args, kws):
         '''
@@ -471,7 +426,7 @@ class Program(object):
         '''
         self.contents.remove_each(args, **kws)
     
-    #---------------------------------------------------------------------------
+
     @text_handler
     def cmd_replace(self, args, kws):
         '''
@@ -482,11 +437,9 @@ class Program(object):
         args = [(a, replacement) for a in args]
         self.contents.replace_each(args, **kws)
     
-    #---------------------------------------------------------------------------
-    # HTML methods
-    #---------------------------------------------------------------------------
 
-    #---------------------------------------------------------------------------
+    # HTML methods
+
     @html_handler
     def cmd_remove_attrs(self, args, kws):
         '''
@@ -494,7 +447,7 @@ class Program(object):
         '''
         self.contents.remove_attrs(args[0] if args else None, **kws)
     
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_unwrap(self, args, kws):
         '''
@@ -502,7 +455,7 @@ class Program(object):
         '''
         self.contents.unwrap(args, **kws)
     
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_unwrap_attr(self, args, kws):
         '''
@@ -510,7 +463,7 @@ class Program(object):
         '''
         self.contents.unwrap_attr(args[0], args[1])
     
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_extract(self, args, kws):
         '''
@@ -518,7 +471,7 @@ class Program(object):
         '''
         self.contents.extract(args, **kws)
     
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_select(self, args, kws):
         '''
@@ -526,7 +479,6 @@ class Program(object):
         '''
         self.contents.select(args[0], limit=kws.get('limit'))
 
-    #---------------------------------------------------------------------------
     @html_handler
     def cmd_select_attr(self, args, kws):
         '''
@@ -534,7 +486,7 @@ class Program(object):
         '''
         self.contents.select_attr(args[0], args[1])
         
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_replace_tag(self, args, kws):
         '''
@@ -542,7 +494,7 @@ class Program(object):
         '''
         self.contents.replace_with(args[0], args[1])
     
-    #---------------------------------------------------------------------------
+
     @html_handler
     def cmd_collapse(self, args, kws):
         '''
@@ -551,7 +503,6 @@ class Program(object):
         self.contents.collapse(args[0], **kws)
 
 
-#-------------------------------------------------------------------------------
 def execute_script(filename, contents):
     code = utils.read_file(filename)
     scr = Program(code, contents)

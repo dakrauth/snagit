@@ -1,17 +1,16 @@
-from __future__ import unicode_literals
+import logging
 import bs4
-from .compat import str
 from . import utils
 
-#===============================================================================
-class Formatter(object):
+logger = logging.getLogger(__name__)
 
-    #---------------------------------------------------------------------------
+
+class Formatter:
+
     def __init__(self):
         self.non_closing = utils.get_config('non_closing_tags')
         self.no_indent = utils.get_config('no_indent_tags')
-        
-    #---------------------------------------------------------------------------
+
     def get_attrs(self, el):
         orig = getattr(el, 'attrs', {}) or {}
         return {
@@ -19,7 +18,6 @@ class Formatter(object):
             for key, values in orig.items()
         }
 
-    #---------------------------------------------------------------------------
     def format_attrs(self, el):
         attrs = ''
         orig = getattr(el, 'attrs', {}) or {}
@@ -30,7 +28,6 @@ class Formatter(object):
             
         return attrs
 
-    #---------------------------------------------------------------------------
     def format_element(self, el, lines, depth=0, prefix='    '):
         indent = prefix * depth
         if isinstance(el, bs4.NavigableString):
@@ -61,7 +58,6 @@ class Formatter(object):
     
         return lines
 
-    #---------------------------------------------------------------------------
     def format(self, el, depth=0, prefix='    ', doctype=True):
         lines = []
         if not el and el.contents:
@@ -80,10 +76,9 @@ class Formatter(object):
         # from pprint import pprint; pprint(lines)
         return '\n'.join(lines)
 
-
 _formatter = None
 
-#-------------------------------------------------------------------------------
+
 def format(*args, **kws):
     global _formatter
     if not _formatter:

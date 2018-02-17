@@ -2,17 +2,17 @@
 '''
 Capture, filter, and extract data from the interwebs
 '''
-from __future__ import unicode_literals, print_function
 import re
 import sys
+import logging
 import argparse
 from datetime import datetime
 from . import utils, script, get_version
 from .loader import Loader
 
-verbose = utils.verbose
+logger = logging.getLogger(__name__)
 
-#-------------------------------------------------------------------------------
+
 def parse_args(args=None):
     parser = argparse.ArgumentParser(prog='snarf', description=__doc__)
     parser.add_argument('source', nargs='*')
@@ -37,17 +37,20 @@ def parse_args(args=None):
     
     return parser, parser.parse_args(args)
 
-
-#-------------------------------------------------------------------------------
 def run_program(prog_args=None):
     parser, args = parse_args(prog_args)
     start = datetime.now()
     if args.pdb:
         utils.pdb.set_trace()
     
+    logging.basicConfig(
+        stream=None,
+        level='DEBUG' if args.verbose else 'INFO',
+        format='[%(asctime)s %(levelname)s] %(message)s'
+    )
+
     if args.verbose:
-        utils.enable_debug_logger()
-        verbose('{}', vars(args))
+        logger.debug('{}', vars(args))
     
     if args.version:
         print('{} - v{}'.format(parser.prog, get_version()))
@@ -66,21 +69,18 @@ def run_program(prog_args=None):
     
     if contents and args.output:
         data = str(contents)
-        verbose('Writing {} chars', len(data))
+        logger.debug('Writing {} chars', len(data))
         if args.output == '-':
             sys.stdout.write(data.encode('utf8') + '\n')
         else:
             utils.write_file(args.output, data)
-            verbose('Saved to {}', args.output)
+            logger.debug('Saved to {}', args.output)
     
-    verbose('Completed in {} seconds', datetime.now() - start)
+    logger.debug('Completed in {} seconds', datetime.now() - start)
     return contents
 
-
-#-------------------------------------------------------------------------------
 def main():
     run_program(sys.argv[1:])
-
 
 ################################################################################
 if __name__ == '__main__':
