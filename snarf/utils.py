@@ -47,10 +47,6 @@ BAD_TAGS = {
 }
 
 DEFAULT_CONFIG = {
-    'cache_home': os.environ.get('XDG_CACHE_HOME', os.path.join(
-        os.path.expanduser('~'),
-        '.cache'
-    )),
     'range_delimiter': '{}',
     'user_agents': (
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
@@ -59,12 +55,35 @@ DEFAULT_CONFIG = {
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
         'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
     ),
-    'bad_attrs': 'align alink background bgcolor border clear height hspace language link nowrap start text type valign vlink vspace width'.split(),
+    'bad_tags': BAD_TAGS,
+    'bad_attrs': BAD_ATTRS,
     'non_closing_tags': 'hr br link meta img base input param source'.split(),
     'no_indent_tags': 'body head tr'.split(),
 }
 
 _config_settings = deepcopy(DEFAULT_CONFIG)
+
+
+def extract_args(args):
+    if not args:
+        args = [None]
+    elif isinstance(args, str):
+        args = [args]
+
+    for arg in args:
+        for arg2 in arg.split(','):
+            if arg2:
+                yield arg2
+
+
+def normalize_search_attrs(attrs):
+    if attrs in (None, '*'):
+        return re.compile('.+')
+
+    attrs = list(extract_args(attrs))
+    return re.compile(
+        r'({})'.format('|'.join([a.replace('*', '.*') for a in attrs]))
+    )
 
 
 def set_config(**kws):
@@ -154,6 +173,7 @@ def flatten(lists):
     '''
     return itertools.chain(*lists)
 
+
 range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
 
 
@@ -207,3 +227,21 @@ def expand_range_set(sources, range_set=None):
     
     return results
 
+
+def escaped(txt):
+    for cin, cout in (('\\n', '\n'), ('\\t', '\t')):
+        txt = txt.replace(cin, cout)
+
+    return txt
+
+def join(args, joiner='\n'):
+    return joiner.join(args)
+
+
+
+def get_doc(method, indent='    '):
+    doc = method.__doc__
+    return '' if not doc else utils.join(
+        '{}{}'.format(indent, line.strip())
+        for line in doc.splitlines()
+    )
