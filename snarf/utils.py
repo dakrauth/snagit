@@ -64,23 +64,16 @@ DEFAULT_CONFIG = {
 _config_settings = deepcopy(DEFAULT_CONFIG)
 
 
-def extract_args(args):
-    if not args:
-        args = [None]
-    elif isinstance(args, str):
-        args = [args]
-
-    for arg in args:
-        for arg2 in arg.split(','):
-            if arg2:
-                yield arg2
+def import_string(what):
+    mod_name, name = what.rsplit('.')
+    mod = importlib.import_module(mod_name)
+    return getattr(mod, name)
 
 
 def normalize_search_attrs(attrs):
     if attrs in (None, '*'):
         return re.compile('.+')
 
-    attrs = list(extract_args(attrs))
     return re.compile(
         r'({})'.format('|'.join([a.replace('*', '.*') for a in attrs]))
     )

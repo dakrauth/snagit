@@ -2,10 +2,10 @@ class SnarfError(Exception):
     '''Base Snarf Error'''
 
 
-class ProgramWarning(core.SnarfError):
+class ProgramWarning(SnarfError):
     '''A program warning occurred.'''
 
 
-class ProgramError(core.SnarfError):
+class ProgramError(SnarfError):
     '''A program error occurred.'''
 

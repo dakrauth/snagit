@@ -1,342 +1,250 @@
-# -*- coding:utf8 -*-
-import re
 import os
+import re
+import sys
 import json
+import shlex
 import logging
+import inspect
+import functools
+import importlib
 from pprint import pformat
+from collections import namedtuple
+from traceback import format_tb
+from requests.exceptions import RequestException
 
-import bs4
 import strutil
+from cachely.loader import Loader
 
+from .lib import library, interpreter_library
 from . import utils
-from . import markup
+from . import core
 from . import exceptions
 
-try:
-    import lxml.html
-    DEFAULT_BS4_FEATRUE = 'lxml'
-except ImportError:
-    try:
-        import html5lib
-        DEFAULT_BS4_FEATRUE = 'html5lib'
-    except ImportError:
-        DEFAULT_BS4_FEATRUE = 'html.parser'
-
 logger = logging.getLogger(__name__)
+BASE_LIBS = ['snarf.lib.text', 'snarf.lib.lines', 'snarf.lib.soup',]
+ReType = type(re.compile(''))
 
 
-def is_lines(what):
-    return isinstance(what, (list, tuple))
-
-
-def is_soup(what):
-    return isinstance(what, bs4.BeautifulSoup)
-
-
-def is_element(what):
-    return isinstance(what, bs4.PageElement)
-
-
-def is_navigable_string(what):
-    return isinstance(what, bs4.NavigableString)
-
-
-def make_soup(contents='', feature=None):
-    feature = feature or DEFAULT_BS4_FEATRUE
-    if isinstance(contents, (str, bytes)):
-        return bs4.BeautifulSoup(contents, feature)
-
-    if is_soup(contents):
-        contents = contents.contents
-    elif is_element(contents):
-        contents = [contents]
-    elif not isinstance(contents, list):
-        raise ValueError('Cannot create soup from type {}'.format(type(contents)))
-
-    soup = bs4.BeautifulSoup('', feature)
-    soup.contents.clear()
-    for el in contents:
-        soup.append(el.__copy__())
-
-    return soup
-
-
-class Bits:
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def __len__(self):
-        return len(self._data)
-
-    def serialize(self, format):
-        data = str(self._data)
-        return "'''{}'''".format(data) if format == 'python' else data
-
-    def __getattr__(self, attr):
-        return getattr(self._data, attr)
-
-    @staticmethod
-    def create(data, guess=False):
-        if is_lines(data):
-            return Lines(data)
-        elif is_soup(data):
-            return Soup(data)
-
-        if isinstance(data, bytes):
-            data = data.decode()
-
-        if strutil.is_string(data):
-            if guess:
-                c = content.strip()
-                if c.startswith('<') and c.endswith('>'):
-                    return Soup(data)
-            return Text(data)
-            
-        raise ValueError('Cannot create data type, must be string or list')
-
-
-class Text(Bits):
+class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
     '''
-    Handler class for manipulating a block text.
+    ``Instruction``'s take the form::
+
+        command [arg [arg ...]] [key=arg [key=arg ...]]
+
+    Where ``arg`` can be one of: single quoted string, double quoted string,
+    digit, True, False, None, or a simple, unquoted string.
+    '''
+    values_pat = r'''
+        [rj]?'(?:(\'|[^'])*?)' |
+        [r]?"(?:(\"|[^"])*?)"  |
+        (\d+)                  |
+        (True|False|None)      |
+        ([^\s,]+)
     '''
 
-    def __init__(self, data):
-        self._data = data
-
-    def __iter__(self):
-        return iter(self._data.splitlines())
-
-    def __str__(self):
-        return self._data
-
-
-class Soup(Bits):
-    '''
-    Handler for manipulating a block of Soup.
-    '''
-
-    def __init__(self, data):
-        self._data = data if is_soup(data) else make_soup(str(data))
-
-    def soup(self):
-        return make_soup(self._data)
-
-    def __str__(self):
-        return markup.format(self._data)
-
-    def serialize(self, format):
-        results = []
-        for item in self._data.findChildren(recursive=False):
-            values = []
-            results.append(values)
-            for content in item.contents:
-                if is_navigable_string(content):
-                    content = content.strip()
-                    if content:
-                        values.append(content)
-                else:
-                    content = content.string
-                    values.append(content.strip() if content else '')
-
-        return pformat(results)
-
-
-class Lines(Bits):
-    '''
-    Handler class for manipulating and traversing lines of text.
-    '''
-
-    def __init__(self, data):
-        self._data = data[:] if is_lines(data) else str(data).splitlines()
-
-    def __str__(self):
-        return '\n'.join(self._data)
-
-    def serialize(self, format):
-        return pformat(self._data)
-
-
-class SoupContentMixin:
-
-    bad_attrs = utils.get_config('bad_attrs')
-
-    def _invoke_cmd(self, cmd, args):
-        if strutil.is_string(args):
-            args = args.split(',')
-        
-        soup = self.soup()
-        for item in args:
-            for el in soup.select(item):
-                method = getattr(el, cmd)
-                method()
-                
-        return Content(make_soup(soup))
-
-    def unwrap(self, tags):
-        return self._invoke_cmd('unwrap', tags)
-
-    def unwrap_attr(self, query, attr):
-        soup = self.soup()
-        for el in soup.select(query):
-            el.replace_with(getattr(el, 'attrs', {}).get(attr, ''))
-            
-        return Content(make_soup(soup))
-
-    def extract(self, tags):
-        return self._invoke_cmd('extract', tags)
-
-    def replace_with(self, query, what):
-        soup = self.soup()
-        for el in soup.select(query):
-            el.replace_with(what)
-        
-        return Content(make_soup(soup))
-
-    def select(self, query, limit=None):
-        results = self.soup().select(query, limit=limit)
-        logger.debug('Selected {} matches'.format(len(results)))
-        return Content(make_soup(results)) if results else self
-
-    def extract_empty(self, args):
-        soup = self.soup()
-        args = utils.extract_args(args)
-        for el in soup.select(args or True):
-            if not (any(el.attrs) or any(el.stripped_strings)):
-                el.extract()
-
-        return Content(make_soup(soup))
-
-    def remove_attrs(self, attrs=None, query=None):
-        attrs_re = utils.normalize_search_attrs(attrs)
-        soup = self.soup()
-
-        if query:
-            elements = soup.select(query)
-        else:
-            elements = soup.find_all(True)
-
-        for el in elements:
-            el.attrs = {
-                k: v for k,v in el.attrs.items()
-                if not attrs_re.match(k)
-            }
-        
-        return Content(make_soup(soup))
-
-    def collapse(self, query, joiner=','):
-        soup = self.soup()
-        for item in soup.select(query):
-            item.string = joiner.join(item.stripped_strings)
-            
-        return Content(make_soup(soup))
-
-
-class TextContentMixin:
-
-    def remove_each(self, items, **kws):
-        return Content(strutil.remove_each(self.text(), items, **kws))
-
-    def replace_each(self, items, **kws):
-        return Content(strutil.replace_each(self.text(), items, **kws))
-
-    def compress(self):
-        return Content(' '.join(l.strip().split()) for l in self.lines())
-
-
-class LinesContentMixin:
+    args_re = re.compile(
+        r'''^(
+            (?P<kwd>\w[\w\d-]*)=(?P<val>{0}) |
+            (?P<arg>{0}|([\s,]+))
+        )\s*'''.format(values_pat),
+        re.VERBOSE
+    )
     
-    def format(self, fmt):
-        return Content([
-            fmt.format(line, lineno)
-            for lineno, line in enumerate(self.lines())
+    value_dict = {'True': True, 'False': False, 'None': None}
+
+    def __str__(self):
+        def _repr(w):
+            if isinstance(w, ReType):
+                return 'r"{}"'.format(str(w.pattern))
+            
+            return repr(w)
+
+        return '{}{}{}'.format(
+            self.cmd.upper(),
+            ' {}'.format(
+                ' '.join([_repr(c) for c in self.args]) if self.args else ''
+            ),
+            ' {}'.format(
+                ' '.join(
+                    '%s=%s'.format(key, _repr(v))
+                    for k,v in self.kws.items()
+                ) if self.kws else ''
+            )
+        )
+
+    @classmethod
+    def get_value(cls, s):
+        if s.isdigit():
+            return int(s)
+        elif s in cls.value_dict:
+            return cls.value_dict[s]
+        elif s.startswith(('r"', "r'")):
+            return re.compile(utils.escaped(s[2:-1]))
+        elif s.startswith("j'"):
+            return json.loads(utils.escaped(s[2:-1]))
+        elif s.startswith(('"', "'")):
+            return utils.escaped(s[1:-1])
+        else:
+            return s.strip()
+
+
+    @classmethod
+    def parse(cls, line, lineno):
+        args = []
+        kws = {}
+        cmd, text = strutil.splitter(line, expected=2, strip=True)
+        cmd = cmd.lower()
+
+        while text:
+            m = cls.args_re.search(text)
+            if not m:
+                break
+
+            gdict = m.groupdict()
+            kwd = gdict.get('kwd')
+            if kwd:
+                kws[kwd] = cls.get_value(gdict.get('val', ''))
+            else:
+                arg = gdict.get('arg', '').strip()
+                if arg != ',':
+                    args.append(cls.get_value(arg))
+
+            text = text[len(m.group()):]
+
+        if text:
+            raise SyntaxError('Syntax error: "{}" (line {})'.format(text, lineno))
+
+        return cls(cmd, args, kws, line, lineno)
+
+
+def lexer(code, lineno=0):
+    '''
+    Takes the script source code, scans it, and lexes it into
+    ``Instructions``
+    '''
+    for chars in code.splitlines():
+        lineno += 1
+        line = chars.rstrip()
+        if not line or line.lstrip().startswith('#'):
+            continue
+        
+        logger.debug('Lexed {} byte(s) line {}'.format(len(line), chars))
+        yield Instruction.parse(line, lineno)
+
+
+def load_libraries(extensions=None):
+
+    if isinstance(extensions, str):
+        extensions = [extensions]
+
+    libs = BASE_LIBS + (extensions or [])
+    for lib in libs:
+        importlib.import_module(lib)
+
+
+class Interpreter:
+
+    def __init__(
+        self,
+        contents=None,
+        loader=None,
+        use_cache=False,
+        do_pm=False,
+        extensions=None
+    ):
+        self.use_cache = use_cache
+        self.loader = loader if loader else Loader(use_cache=use_cache)
+        self.contents = Contents(contents)
+        self.do_debug = False
+        self.do_pm = do_pm
+        self.instructions = []
+        load_libraries(extensions)
+
+    def load_sources(self, sources, use_cache=None):
+        use_cache = self.use_cache if use_cache is None else bool(use_cache)
+        contents = self.loader.load_sources(sources)
+        self.contents.update([
+            ct.decode() if isinstance(ct, bytes) else ct for ct in contents
         ])
 
-    def strip(self):
-        return Content([l.strip() for l in self.lines()])
+    def listing(self, linenos=False):
+        items = []
+        for instr in self.instructions:
+            items.append('{}{}'.format(
+                '{} '.format(instr.lineno) if linenos else '',
+                instr.line
+            ))
 
-    def skip_to(self, what, keep=True):
-        lines = self.lines()
-        found = strutil.find_first(lines, what)
-        if found is not None:
-            if not keep:
-                found += 1
-            
-            return Content(lines[found:])
+        return items
 
-        return self
+    def lex(self, code):
+        lineno = self.instructions[-1].lineno if self.instructions else 0
+        instructions = list(lexer(code, lineno))
+        self.instructions.extend(instructions)
+        return instructions
 
-    def read_until(self, what, keep=True):
-        lines = self.lines()
-        found = strutil.find_first(lines, what)
-        if found is not None:
-            if keep:
-                found += 1
-            
-            return Content(lines[:found])
+    def execute(self, code):
+        for instr in self.lex(code):
+            try:
+                self._execute_instruction(instr)
+            except exceptions.ProgramWarning as why:
+                print(why)
 
-        return self
+        return self.contents
 
-    def matches(self, what):
-        return Content([l for l in self.lines() if strutil.matches(l, what)])
+    def _load_handler(self, instr):
+        if instr.cmd in library.registry:
+            func = library.registry[instr.cmd]
+            return self.contents, (func, instr.args, instr.kws)
+        
+        elif instr.cmd in interpreter_library.registry:
+            func = interpreter_library.registry[instr.cmd]
+            return func, (self, instr.args, instr.kws)
+        
+        raise exceptions.ProgramWarning(
+            'Unknown instruction (line {}): {}'.format(instr.lineno, instr.cmd)
+        )
 
+    def _execute_instruction(self, instr):
+        logger.debug('Executing {}'.format(instr.cmd))
+        handler, args = self._load_handler(instr)
 
-class ContentBase(TextContentMixin, SoupContentMixin, LinesContentMixin):
+        do_debug, self.do_debug = self.do_debug, False
+        if do_debug:
+            utils.pdb.set_trace()
 
-    def __init__(self, data='', guess=False):
-        self._data = Bits.create(data, guess)
-
-    def __repr__(self):
-        return 'Content({})'.format(self._data.__class__.__name__)
-
-    def __str__(self):
-        return str(self._data)
-
-    def __iter__(self):
-        return iter(self._data)
-
-    def text(self):
-        return str(self)
-
-    def lines(self):
-        return str(self).splitlines()
-
-    def soup(self):
-        if isinstance(self._data, Soup):
-            return self._data.soup()
-
-        return make_soup(str(self))
-
-    def convert(self, convert_to):
-        if convert_to == 'text':
-            return Content(self.text())
-        elif convert_to == 'lines':
-            return Content(self.lines())
-        elif convert == soup:
-            return Content(self.soup())
-
-        return self
-
-    def serialize(self, format='python', variable='data'):
-        if format == 'python':
-            text = '{} = {}'.format(variable, self._data.serialize(format))
-        elif format == 'json':
-            text = json.dumps(self._data.serialize(format))
-        else:
-            raise ValueError('Unknown serialization format: {}'.format(format))
-            
-        return Content(text)
+        try:
+            handler(*args)
+        except:
+            exc, value, tb = sys.exc_info()
+            if self.do_pm:
+                logger.error(
+                    'Script exception, line {}: {} (Entering post_mortem)'.format(
+                        instr.lineno,
+                        value
+                    )
+                )
+                utils.pdb.post_mortem(tb)
+            else:
+                raise
 
 
-class Content(ContentBase):
-    pass
+def execute_script(filename, contents=''):
+    code = utils.read_file(filename)
+    return execute_code(code, contents)
+
+
+def execute_code(code, contents=''):
+    #import pdb; pdb.set_trace()
+    intrep = Interpreter([contents])
+    return str(intrep.execute(code))
 
 
 class Contents:
 
-    def __init__(self, contents=None, guess=False, content_class=Content):
+    def __init__(self, contents=None):
         self.stack = []
-        self.set_contents(contents, guess=guess)
+        self.set_contents(contents)
 
     def __iter__(self):
         return iter(self.contents)
@@ -345,63 +253,40 @@ class Contents:
         return len(self.contents)
 
     def __str__(self):
-        return '\n'.join([str(c) for c in self])
+        return '\n'.join(str(c) for c in self)
 
-    def __getitem__(self, index):
-        return self.contents[index]
+    # def __getitem__(self, index):
+    #     return self.contents[index]
 
-    def end(self):
+    def pop(self):
         self.contents = self.stack.pop()
 
+    def __call__(self, func, args, kws):
+        contents = []
+        for data in self:
+            result = func(data, args, kws)
+            contents.append(result)
+
+        self.update(contents)
+
+    def merge(self):
+        if self.contents:
+            first = self.contents[0]._data
+            data = first.merge([c._data for c in self.contents])
+            self.update([data])
+        
     def update(self, contents):
         if self.contents:
             self.stack.append(self.contents)
+        
         self.set_contents(contents)
 
-    def __call__(self, name, args=None, kws=None):
-        args = args or ()
-        kws = kws or {}
-
-        if not hasattr(self.content_class, name):
-            raise AttributeError('Unknown attribute "{}"'.format(attr))
-            
-        contents = []
-        for ct in self.contents:
-            fn = getattr(ct, name)
-            result = fn(*args, **kws)
-            contents.append(result)
-        self.update(contents)
-
-    def data_merge(self):
-        data = None
-        if self.contents:
-            ct = self.contents[0]._data
-            if isinstance(ct, Lines):
-                data = []
-                for ct in self.contents:
-                    data.extend(ct._data)
-            elif isinstance(ct, Soup):
-                data = make_soup()
-                for ct in self.contents:
-                    data.contents.extend(ct._data.body())
-            else:
-                data = str(self)
-        
-        return data
-
-    def combine(self):
-        '''
-        Distill contents into a single piece of content.
-        '''
-        if self.contents:
-            data = self.data_merge()
-            self.update([data])
-
-    def set_contents(self, contents, guess=False):
+    def set_contents(self, contents):
         self.contents = []
-        if contents:
-            for content in contents:
-                if not isinstance(content, self.content_class):
-                    content = self.content_class(content, guess=guess)
-                        
-                self.contents.append(content)
+        
+        if isinstance(contents, str):
+            contents = [contents]
+
+        contents = contents or []
+        for content in contents:
+            self.contents.append(content)
