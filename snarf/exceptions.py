@@ -9,3 +9,6 @@ class ProgramWarning(SnarfError):
 class ProgramError(SnarfError):
     '''A program error occurred.'''
 
+
+class SnarfQuit(SnarfError):
+    '''User quits repl'''

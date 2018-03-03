@@ -2,14 +2,20 @@ from prompt_toolkit.shortcuts import get_input
 from prompt_toolkit.history import FileHistory
 
 from .core import Interpreter
+from .exceptions import SnarfQuit
+
 
 class Repl(Interpreter):
 
-    def get_input(self, prompt='> '):
-        return get_input(prompt, history=self.history).strip()
+    def __init__(self, *args, **kws):
+        self.input_handler = kws.pop('input_handler', get_input)
+        super().__init__(*args, **kws)
 
-    def repl(self, print_all=False):
-        self.history = FileHistory('.snarf_history')
+    def get_input(self, prompt='> '):
+        return self.input_handler(prompt, history=self.history).strip()
+
+    def repl(self, print_all=False, history='.snarf_history'):
+        self.history = FileHistory('.snarf_history') if history else None
         print('Type "help" for more information. Ctrl+c to exit')
         while True:
             try:
@@ -27,8 +33,12 @@ class Repl(Interpreter):
             if line.startswith('?'):
                 line = 'help ' + line[1:]
 
-            self.execute(line)
-            if print_all:
-                print(str(self.contents))
+            try:
+                self.execute(line)
+            except SnarfQuit:
+                break
+            finally:
+                if print_all:
+                    print(str(self.contents))
 
         return self.contents

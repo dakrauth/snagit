@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 
 from snarf import utils
+from snarf import repl
+
 from snarf.core import Interpreter, execute_code, lexer
 
 HERE = Path(__file__).parent
@@ -73,26 +75,6 @@ class TestParse:
         )
 
 
-LINES = [
-    'foo bar baz',
-    'spam     ',
-    'xxxxxxxx',
-    'zzzz',
-    '        123',
-    '   u6ejtryn',
-    '456',
-]
-
-
-def join_lines(start=0, end=len(LINES), task=None):
-    task = task or (lambda s: s)
-    return '\n'.join([task(line) for line in LINES[start:end]])
-
-
-@pytest.fixture
-def lines():
-    return join_lines()
-
 
 def read_test_data(basename):
     return utils.read_file(DATA_DIR / basename)
@@ -104,6 +86,16 @@ class TestProgram:
         text = execute_code('help')
         captured = capsys.readouterr()
         assert 'Commands' in captured.out
+        assert not text
+
+        text = execute_code('help help')
+        captured = capsys.readouterr()
+        assert 'Display help on available commands' in captured.out
+        assert not text
+
+        text = execute_code('help ----')
+        captured = capsys.readouterr()
+        assert 'Unknown command ----' in captured.out
         assert not text
 
     def test_list(self, capsys):
@@ -120,27 +112,40 @@ class TestProgram:
         text = execute_code('load https://example.com')
         assert 'Example Domain' in text
 
+        text = execute_code('load http://$')
+        captured = capsys.readouterr()
+        assert 'ERROR' in captured.out
+        assert '' == text
 
-class TestLines:
+    def test_load_all(self, capsys):
+        text = execute_code('load_all', ['http://httpbin.org/links/2/0', 'http://httpbin.org/links/2/1'])
+        assert text == "<html><head><title>Links</title></head><body>0 <a href='/links/2/1'>1</a> </body></html>\n<html><head><title>Links</title></head><body><a href='/links/2/0'>0</a> 1 </body></html>"
+
+    def test_parse_line(self, capsys):
+        text = execute_code('parse_line a b "c d" x=9')
+        captured = capsys.readouterr().out
+        assert "'a', 'b', 'c d'" in captured
+        assert "'x': 9" in captured
+
+    def test_print(self, capsys):
+        execute_code('print', 'foobar')
+        assert 'foobar' == capsys.readouterr().out.strip()
+
+class TestRepl:
     
-    def test_str(self, lines):
-        text = execute_code('', lines)
-        assert text == lines
+    def test_repl(self, capsys):
+        def _inputs():
+            yield ''
+            yield 'quit'
+            yield '?'
+            raise KeyboardInterrupt('')
 
-    def test_strip(self, lines):
-        text = execute_code('strip', lines)
-        assert text == join_lines(task=lambda s: s.strip())
+        inputs = _inputs()
+        def input_handler(prompt, history=None):
+            return next(inputs)
 
-    def test_skip_to(self, lines):
-        text = execute_code('skip_to 123 keep=False', lines)
-        assert text == join_lines(-2)
+        r = repl.Repl(input_handler=input_handler)
+        assert str(r.repl(print_all=True, history=None)) == ''
+        
+        assert str(r.repl(history=None)) == ''
 
-    def test_read_until(self, lines):
-        text = execute_code('read_until 456 keep=False', lines)
-        assert text == join_lines(end=-1)
-
-    def _xyztest_end(self, lines):
-        text = lines('skip_to zzzz')
-        lines.end()
-        text = str(lines)
-        assert text == join_lines()

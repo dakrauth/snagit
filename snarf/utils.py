@@ -12,7 +12,7 @@ try:
     import requests
 except ImportError:
     warning.warn('Missing `requests` installation', ImportWarning)
-    
+
 try:
     import ipdb as pdb
 except ImportError:
@@ -47,11 +47,11 @@ BAD_TAGS = {
 DEFAULT_CONFIG = {
     'range_delimiter': '{}',
     'user_agents': (
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',
-        'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:22.0) Gecko/20100 101 Firefox/22.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.7; rv:11.0) Gecko/20100101 Firefox/11.0',  # noqa
+        'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:22.0) Gecko/20100 101 Firefox/22.0',  # noqa
         'Mozilla/5.0 (Windows NT 6.1; rv:11.0) Gecko/20100101 Firefox/11.0',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
-        'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_4) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',  # noqa
+        'Mozilla/5.0 (Windows; Windows NT 6.1) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.46 Safari/536.5',  # noqa
     ),
     'bad_tags': BAD_TAGS,
     'bad_attrs': BAD_ATTRS,
@@ -92,18 +92,18 @@ def get_config(key=None, default=None):
 def read_url(url):
     '''
     Read data from ``url``.
-    
+
     Returns a 2-tuple of (text, content_type)
     '''
     ua = get_config('user_agents')
     headers = {'accept-language': 'en-US,en'}
     if ua:
         headers['User-Agent'] = random.choice(ua)
-    
+
     r = requests.get(url, headers=headers)
     if not r.ok:
         raise requests.HTTPError('URL {}: {}'.format(r.reason, url))
-        
+
     ct = r.headers.get('content-type')
     return (r.text, ct)
 
@@ -142,14 +142,14 @@ def _get_range_run(start, end):
         if len(start) > 1 and start[0] == '0':
             fmt = '{{:0>{}}}'.format(len(start))
         return [fmt.format(c) for c in range(int(start), int(end) + 1)]
-    
+
     return [chr(c) for c in range(ord(start), ord(end) + 1)]
 
 
 def get_range_set(text):
     '''
     Convert a string of range-like tokens into list of characters.
-    
+
     For instance, ``'A-Z'`` becomes ``['A', 'B', ..., 'Z']``.
     '''
     values = []
@@ -159,11 +159,11 @@ def get_range_set(text):
             if text:
                 values.extend(list(text))
             break
-        
+
         i, j = m.span()
         if i:
             values.extend(list(text[:i]))
-        
+
         text = text[j:]
         start, end = m.group().split('-')
         values.extend(_get_range_run(start, end))
@@ -174,16 +174,16 @@ def get_range_set(text):
 def expand_range_set(sources, range_set=None):
     if is_string(sources):
         sources = [sources]
-    
+
     if not range_set:
         return sources
-        
+
     results = []
     chars = get_range_set(range_set)
     delim = get_config('range_delimiter')
     for src in sources:
         results.extend([src.replace(delim, c) for c in chars])
-    
+
     return results
 
 

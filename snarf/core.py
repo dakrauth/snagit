@@ -21,7 +21,7 @@ from . import core
 from . import exceptions
 
 logger = logging.getLogger(__name__)
-BASE_LIBS = ['snarf.lib.text', 'snarf.lib.lines', 'snarf.lib.soup',]
+BASE_LIBS = ['snarf.lib.text', 'snarf.lib.lines', 'snarf.lib.soup']
 ReType = type(re.compile(''))
 
 
@@ -49,14 +49,14 @@ class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
         )\s*'''.format(values_pat),
         re.VERBOSE
     )
-    
+
     value_dict = {'True': True, 'False': False, 'None': None}
 
     def __str__(self):
         def _repr(w):
             if isinstance(w, ReType):
                 return 'r"{}"'.format(str(w.pattern))
-            
+
             return repr(w)
 
         return '{}{}{}'.format(
@@ -67,7 +67,7 @@ class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
             ' {}'.format(
                 ' '.join(
                     '{}={}'.format(key, _repr(v))
-                    for k,v in self.kws.items()
+                    for k, v in self.kws.items()
                 ) if self.kws else ''
             )
         )
@@ -86,7 +86,6 @@ class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
             return utils.escaped(s[1:-1])
         else:
             return s.strip()
-
 
     @classmethod
     def parse(cls, line, lineno):
@@ -112,7 +111,9 @@ class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
             text = text[len(m.group()):]
 
         if text:
-            raise SyntaxError('Syntax error: "{}" (line {})'.format(text, lineno))
+            raise SyntaxError(
+                'Syntax error: "{}" (line {})'.format(text, lineno)
+            )
 
         return cls(cmd, args, kws, line, lineno)
 
@@ -127,7 +128,7 @@ def lexer(code, lineno=0):
         line = chars.rstrip()
         if not line or line.lstrip().startswith('#'):
             continue
-        
+
         logger.debug('Lexed {} byte(s) line {}'.format(len(line), chars))
         yield Instruction.parse(line, lineno)
 
@@ -196,11 +197,11 @@ class Interpreter:
         if instr.cmd in library.registry:
             func = library.registry[instr.cmd]
             return self.contents, (func, instr.args, instr.kws)
-        
+
         elif instr.cmd in interpreter_library.registry:
             func = interpreter_library.registry[instr.cmd]
             return func, (self, instr.args, instr.kws)
-        
+
         raise exceptions.ProgramWarning(
             'Unknown instruction (line {}): {}'.format(instr.lineno, instr.cmd)
         )
@@ -215,11 +216,11 @@ class Interpreter:
 
         try:
             handler(*args)
-        except:
+        except Exception:
             exc, value, tb = sys.exc_info()
             if self.do_pm:
                 logger.error(
-                    'Script exception, line {}: {} (Entering post_mortem)'.format(
+                    'Script exception, line {}: {} (Entering post_mortem)'.format(  # noqa
                         instr.lineno,
                         value
                     )
@@ -235,8 +236,7 @@ def execute_script(filename, contents=''):
 
 
 def execute_code(code, contents=''):
-    #import pdb; pdb.set_trace()
-    intrep = Interpreter([contents])
+    intrep = Interpreter(contents)
     return str(intrep.execute(code))
 
 
@@ -271,19 +271,19 @@ class Contents:
 
     def merge(self):
         if self.contents:
-            first = self.contents[0]._data
-            data = first.merge([c._data for c in self.contents])
+            first = self.contents[0]
+            data = first.merge(self.contents)
             self.update([data])
-        
+
     def update(self, contents):
         if self.contents:
             self.stack.append(self.contents)
-        
+
         self.set_contents(contents)
 
     def set_contents(self, contents):
         self.contents = []
-        
+
         if isinstance(contents, str):
             contents = [contents]
 

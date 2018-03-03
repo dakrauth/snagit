@@ -10,7 +10,7 @@ from snarf import utils
 
 
 def test_import_string():
-    make_lines = utils.import_string('snarf.lib.lines.make_lines')
+    make_lines = utils.import_string('snarf.lib.lines.lines')
     assert make_lines.kind == 'Lines'
 
 
