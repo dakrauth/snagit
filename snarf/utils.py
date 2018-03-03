@@ -1,10 +1,8 @@
 import re
-import os
-import codecs
 import random
 import logging
-import mimetypes
-import itertools
+import importlib
+from pathlib import Path
 from copy import deepcopy
 from strutil import is_string, is_regex
 
@@ -65,7 +63,7 @@ _config_settings = deepcopy(DEFAULT_CONFIG)
 
 
 def import_string(what):
-    mod_name, name = what.rsplit('.')
+    mod_name, name = what.rsplit('.', 1)
     mod = importlib.import_module(mod_name)
     return getattr(mod, name)
 
@@ -91,18 +89,6 @@ def get_config(key=None, default=None):
     return _config_settings.get(key, default) if key else _config_settings
 
 
-def guess_extension(content_type):
-    if ';' in content_type:
-        content_type = content_type.split(';')[0]
-    
-    ext = mimetypes.guess_extension(content_type, False)
-    if not ext:
-        content_type = content_type.replace('/x-', '/')
-        ext = mimetypes.guess_extension(content_type, False)
-    
-    return ext or ''
-
-
 def read_url(url):
     '''
     Read data from ``url``.
@@ -122,24 +108,11 @@ def read_url(url):
     return (r.text, ct)
 
 
-def seq(what):
-    '''
-    Make a ``list``-like sequence of ``what``.
-    
-    If ``what`` is a string or unicode, wrap it in a ``list``.
-    '''
-    return [what] if is_string(what) else what
-
-
 def absolute_filename(filename):
     '''
     Do all those annoying things to arrive at a real absolute path.
     '''
-    return os.path.abspath(
-        os.path.expandvars(
-            os.path.expanduser(filename)
-        )
-    )
+    return str(Path(filename).expanduser().resolve())
 
 
 def write_file(filename, data, mode='w', encoding='utf8'):
@@ -147,7 +120,7 @@ def write_file(filename, data, mode='w', encoding='utf8'):
     Write ``data`` to properly encoded file.
     '''
     filename = absolute_filename(filename)
-    with codecs.open(filename, mode, encoding=encoding) as fp:
+    with open(filename, mode, encoding=encoding) as fp:
         fp.write(data)
 
 
@@ -156,15 +129,8 @@ def read_file(filename, encoding='utf8'):
     Read ``data`` from properly encoded file.
     '''
     filename = absolute_filename(filename)
-    with codecs.open(filename, 'r', encoding=encoding) as fp:
+    with open(filename, 'r', encoding=encoding) as fp:
         return fp.read()
-
-
-def flatten(lists):
-    '''
-    Single-level conversion of things to an iterable.
-    '''
-    return itertools.chain(*lists)
 
 
 range_re = re.compile(r'''([a-zA-Z]-[a-zA-Z]|\d+-\d+)''', re.VERBOSE)
@@ -226,15 +192,3 @@ def escaped(txt):
         txt = txt.replace(cin, cout)
 
     return txt
-
-def join(args, joiner='\n'):
-    return joiner.join(args)
-
-
-
-def get_doc(method, indent='    '):
-    doc = method.__doc__
-    return '' if not doc else utils.join(
-        '{}{}'.format(indent, line.strip())
-        for line in doc.splitlines()
-    )

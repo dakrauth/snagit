@@ -29,7 +29,7 @@ class TestParse:
         assert inst.kws == expect_kws
     
     def test_single_quote(self):
-        self._assert_instruction("foo, bar 'baz spam'", 'foo', ['bar', 'baz, spam'], {})
+        self._assert_instruction("foo bar 'baz, spam'", 'foo', ['bar', 'baz, spam'], {})
 
 
     def test_regex(self):
@@ -68,7 +68,7 @@ class TestParse:
         self._assert_instruction(
             """CMD a b2,  12 'c'  e34, "f5" g-1=123,h,i="a,b,c" j=r',"a"' """,
             'cmd',
-            ['a', 'b2', 12, "'c'", 'e34', "f5", 'h'],
+            ['a', 'b2', 12, 'c', 'e34', "f5", 'h'],
             {'g-1': 123, 'i': 'a,b,c', 'j': regex(',"a"')}
         )
 
@@ -113,7 +113,8 @@ class TestProgram:
 
         text = interp.execute('list')
         captured = capsys.readouterr()
-        assert len(captured.out.splitlines()) == 4
+        lines = captured.out.splitlines()
+        assert len(lines) == 3
 
     def test_load(self, capsys):
         text = execute_code('load https://example.com')

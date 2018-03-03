@@ -66,7 +66,7 @@ class Instruction(namedtuple('Instruction', 'cmd args kws line lineno')):
             ),
             ' {}'.format(
                 ' '.join(
-                    '%s=%s'.format(key, _repr(v))
+                    '{}={}'.format(key, _repr(v))
                     for k,v in self.kws.items()
                 ) if self.kws else ''
             )
