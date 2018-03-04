@@ -3,6 +3,41 @@ snarf
 
 Yet another scrapping tool.
 
+``snarf`` allows you to scrape multiple pages or documents by either running
+script files, or in the interactive REPL. For instance::
+
+    $ snarf
+    Type "help" for more information. Ctrl+c to exit
+    > load http://httpbin.org/links/3/{} range='0-2'
+    > print
+    <html><head><title>Links</title></head><body>0 <a href='/links/3/1'>1</a> <a href='/links/3/2'>2</a> </body></html>
+    <html><head><title>Links</title></head><body><a href='/links/3/0'>0</a> 1 <a href='/links/3/2'>2</a> </body></html>
+    <html><head><title>Links</title></head><body><a href='/links/3/0'>0</a> <a href='/links/3/1'>1</a> 2 </body></html>
+    > select a
+    > print
+    <a href="/links/3/1">1</a>
+    <a href="/links/3/2">2</a>
+    <a href="/links/3/0">0</a>
+    <a href="/links/3/2">2</a>
+    <a href="/links/3/0">0</a>
+    <a href="/links/3/1">1</a>
+    > unwrap_attr a href
+    > print
+    /links/3/1
+    /links/3/2
+    /links/3/0
+    /links/3/2
+    /links/3/0
+    /links/3/1
+    > list
+    LOAD 'http://httpbin.org/links/3/{}' range='0-2'
+    PRINT
+    SELECT 'a'
+    PRINT
+    UNWRAP_ATTR 'a' 'href'
+    PRINT
+
+
 Features
 --------
 
