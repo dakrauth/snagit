@@ -15,5 +15,5 @@ install:
 
 # Command to run tests, e.g. python setup.py test
 script:
-  - pytest 
+  - inv test 
 
