@@ -1,7 +1,10 @@
 # Python versions for matrix
 language: python
+branches:
+  only:
+    - master
+
 python:
-  - "3.4"
   - "3.5"
   - "3.6"
 
@@ -13,7 +16,7 @@ install:
 
 # Command to run tests, e.g. python setup.py test
 script:
-  - py.test
+  - pytest
 
 # Report to coveralls
 after_success:
