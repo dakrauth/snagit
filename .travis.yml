@@ -16,7 +16,7 @@ install:
 
 # Command to run tests, e.g. python setup.py test
 script:
-  - python -m pytest
+  - pytest tests/test_utils.py
 
 # Report to coveralls
 after_success:
