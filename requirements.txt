@@ -2,8 +2,9 @@ beautifulsoup4<4.7
 requests<3.0
 pytest<3.6
 pytest-cov<2.6
-strutil==0.1.3
 prompt-toolkit<1.1
 html5lib<1.1
-invoke
-pycodestyle
+invoke<0.23
+pycodestyle<2.4
+-e git+https://github.com/dakrauth/strutil.git#egg=strutil
+-e git+https://github.com/dakrauth/cachely.git#egg=cachely
