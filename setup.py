@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os, sys
-from setuptools import setup
+from setuptools import find_packages, setup
 
 if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
@@ -30,7 +30,7 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
     ),
-    packages=['snarf'],
+    packages=find_packages(),
     install_requires=['requests', 'beautifulsoup4', 'strutil'],
     entry_points = {
         'console_scripts': ['snarf = snarf.__main__:main']
