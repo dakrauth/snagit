@@ -57,6 +57,7 @@ DEFAULT_CONFIG = {
     'bad_attrs': BAD_ATTRS,
     'non_closing_tags': 'hr br link meta img base input param source'.split(),
     'no_indent_tags': 'body head tr'.split(),
+    'parser': 'lxml'
 }
 
 _config_settings = deepcopy(DEFAULT_CONFIG)

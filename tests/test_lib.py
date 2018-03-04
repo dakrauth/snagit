@@ -1,4 +1,6 @@
+import re
 import pytest
+from snarf import utils
 from snarf.core import execute_code
 
 LINES = [
@@ -69,4 +71,81 @@ class TestText:
     def test_compress_text(self):
         assert 'a\nb c\nd' == execute_code('compress_text', '       a    \n\n\n\n b\t\tc\n\r\nd       ')
 
+    def test_merge(self):
+        assert 'a\nb\nc' == execute_code('merge', 'a b c'.split())
 
+
+
+def compress(text):
+    return ''.join(re.findall(r'([\S]+)', text))
+
+
+html = '<p>Hello, <b class="foo">world</b></p>'
+
+
+class TestSoup:
+
+    def setup_method(self):
+        utils.set_config(parser='html.parser')
+
+    def test_unwrap(self):
+        #import pdb; pdb.set_trace()
+        text = execute_code('unwrap b', html)
+        assert compress('<p>Hello, world</p>') == compress(text)
+
+        text = execute_code('unwrap p', html)
+        assert compress('Hello, <b class="foo">world</b>') == compress(text)
+
+    def test_unwrap_attr(self):
+        text = execute_code('unwrap_attr b class', html)
+        assert compress('<p>Hello, foo</p>') == compress(text)
+
+    def test_remove_attrs(self):
+        h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i></span>'
+        text = execute_code('remove_attrs class', h)
+        assert compress('<span foo="bar"><b></b><i data-foo-bar="#"></i></span>') == compress(text)
+
+        text = execute_code('remove_attrs class query=i', h)
+        assert compress('<span foo="bar"><b class="b"></b><i data-foo-bar="#"></i></span>') == compress(text)
+
+        text = execute_code('remove_attrs data-* foo', h)
+        assert compress('<span><b class="b"></b><i class="i"></i></span>') == compress(text)
+
+    def test_select(self):
+        h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i></span>'
+        text = execute_code('select [data-foo-bar]', h)
+        assert compress('<i class="i" data-foo-bar="#"></i>') == compress(text)
+
+    def test_replace_tag_string(self):
+        text = execute_code('replace_tag_string .foo r"[ld]+" k', html)
+        assert compress('<p>Hello, <b class="foo">work</b></p>') == compress(text)
+
+    def test_extract(self):
+        text = execute_code('extract .foo', html)
+        assert compress('<p>Hello, </p>') == compress(text)
+
+
+    def test_replace_with(self):
+        text = execute_code('replace_with .foo world', html)
+        assert compress('<p>Hello, world</p>') == compress(text)
+
+    def test_normalize_tag(self):
+        text = execute_code(
+            'extract .foo \nnormalize_tag',
+            '<p>Hello, <b class="foo">world</b> <i>!</i></p>'
+        )
+        
+        assert compress('<p>Hello,<i>!</i></p>') == compress(text)
+
+    def test_compress(self):
+        text = execute_code('select p\nmerge', ['<div><p>Foo</p></div>', '<div><p>Bar</p></div>'])
+        assert compress('<p>Foo</p><p>Bar</p>') == compress(text)
+
+    def test_extract_empty(self):
+        text = execute_code('extract_empty', '<p>Hello, <i></i>world')
+        assert compress('<p>Hello, world</p>') == compress(text)
+
+    def test_find_all(self):
+        h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i></span>'
+        text = execute_code('find_all b', h)
+        assert compress('<b class="b"></b>') == compress(text)

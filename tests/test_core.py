@@ -7,7 +7,7 @@ import pytest
 from snarf import utils
 from snarf import repl
 
-from snarf.core import Interpreter, execute_code, lexer
+from snarf.core import Interpreter, execute_code, execute_script, lexer
 
 HERE = Path(__file__).parent
 DATA_DIR = HERE / 'data'
@@ -131,6 +131,37 @@ class TestProgram:
         execute_code('print', 'foobar')
         assert 'foobar' == capsys.readouterr().out.strip()
 
+    def test_cache(self):
+        interp = Interpreter()
+        text = interp.execute('cache')
+        assert interp.loader.use_cache == True
+
+    def test_debug(self):
+        interp = Interpreter()
+        text = interp.execute('debug')
+        assert interp.do_debug == True
+
+    def test_end(self):
+        contents = 'a b c'.split()
+        interp = Interpreter(contents)
+        try:
+            interp.execute('end')
+        except:
+            assert False
+
+        interp.execute('merge')
+        assert len(interp.contents.stack) == 1
+        
+        interp.execute('end')
+        assert len(interp.contents.stack) == 0
+
+    def test_run(self):
+        assert "Hello, world" == execute_code('run tests/script.snarf', 'Hello, world#')
+
+    def test_execute_script(self):
+        assert "Hello, world" == execute_script('tests/script.snarf', 'Hello, world#')
+
+
 class TestRepl:
     
     def test_repl(self, capsys):
@@ -149,3 +180,8 @@ class TestRepl:
         
         assert str(r.repl(history=None)) == ''
 
+
+def test_version():
+    from snarf import get_version
+    version = [int(i) for i in get_version().split('.')]
+    assert len(version) > 1

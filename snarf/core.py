@@ -15,7 +15,7 @@ from requests.exceptions import RequestException
 import strutil
 from cachely.loader import Loader
 
-from .lib import library, interpreter_library
+from .lib import library, interpreter_library, DataProxy
 from . import utils
 from . import core
 from . import exceptions
@@ -259,7 +259,8 @@ class Contents:
     #     return self.contents[index]
 
     def pop(self):
-        self.contents = self.stack.pop()
+        if self.stack:
+            self.contents = self.stack.pop()
 
     def __call__(self, func, args, kws):
         contents = []
@@ -284,9 +285,12 @@ class Contents:
     def set_contents(self, contents):
         self.contents = []
 
-        if isinstance(contents, str):
+        if isinstance(contents, (str, bytes)):
             contents = [contents]
 
         contents = contents or []
-        for content in contents:
-            self.contents.append(content)
+        for ct in contents:
+            if isinstance(ct, (str, bytes)):
+                ct = DataProxy(ct)
+            
+            self.contents.append(ct)

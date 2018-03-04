@@ -16,10 +16,10 @@ def develop(ctx):
 
 
 @task
-def test(ctx):
+def test(ctx, filename=''):
     '''Run tests and coverage'''
     ctx.run(
-        "py.test --cov-config .coveragerc --cov-report html --cov-report term --cov=snarf",
+        "py.test --cov-config .coveragerc --cov-report html --cov-report term --cov=snarf {}".format(filename),
         pty=True
     )
 

@@ -8,15 +8,16 @@ Features
 
 * Process data as either a text block, lines of text, or HTML (using BeautifulSoup)
 * Built-in scripting language
-* Option for caching downloaded resources
 * REPL for command line interaction
 
 Requirements
 ------------
 
-* Python 2.7
+* Python 3.4+
 * ``bs4`` (BeautifulSoup 4.x)
 * ``requests``
+* ``strutil``
+* ``cachely``
 
 For testing:
 
@@ -24,8 +25,8 @@ For testing:
 * ``pytest-cov``
 
 
-Testing
--------
+Development and Testing
+-----------------------
 
 Assumptions: you have ``pip`` and ``virtualenv`` installed.
 
@@ -35,8 +36,6 @@ Assumptions: you have ``pip`` and ``virtualenv`` installed.
     $ source bin/activate
     $ git clone https://github.com/dakrauth/snarf.git
     $ cd snarf
-    $ make init
-    $ make test      # -- OR --
-    $ make unittest  # -- OR --
-    $ make coverage
-
+    $ inv develop
+    $ inv test
+    $ inv cov
