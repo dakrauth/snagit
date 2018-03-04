@@ -7,13 +7,14 @@ python:
 
 # Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install:
+  - "pip install coveralls"
   - pip install -r requirements.txt
-  - pip install -e .
+  - "pip install ."
 
 # Command to run tests, e.g. python setup.py test
 script:
   - py.test
 
 # Report to coveralls
-#after_success:
-#  - coveralls
+after_success:
+  - coveralls
