@@ -12,11 +12,11 @@ python:
 install:
   - "pip install coveralls"
   - pip install -r requirements.txt
-  - python setup.py install
+  - pip install -e .
 
 # Command to run tests, e.g. python setup.py test
 script:
-  - pytest
+  - python -m pytest
 
 # Report to coveralls
 after_success:
