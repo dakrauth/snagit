@@ -1,16 +1,16 @@
 '''
-Test snarf.utils
+Test snagit.utils
 '''
 import re
 import json
 import string
 
 import pytest
-from snarf import utils
+from snagit import utils
 
 
 def test_import_string():
-    make_lines = utils.import_string('snarf.lib.lines.lines')
+    make_lines = utils.import_string('snagit.lib.lines.lines')
     assert make_lines.kind == 'Lines'
 
 
@@ -42,8 +42,8 @@ def test_read_url():
 
 
 def test_read_file():
-    text = utils.read_file('../snarf/tests/test_utils.py')
-    assert text.startswith("'''\nTest snarf.utils")
+    text = utils.read_file('../snagit/tests/test_utils.py')
+    assert text.startswith("'''\nTest snagit.utils")
 
 
 def test_set_config():

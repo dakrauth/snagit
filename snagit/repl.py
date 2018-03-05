@@ -3,7 +3,7 @@ from prompt_toolkit.history import FileHistory
 
 from .core import Interpreter
 from .exceptions import SnarfQuit
-
+from . import utils
 
 class Repl(Interpreter):
 
@@ -14,8 +14,12 @@ class Repl(Interpreter):
     def get_input(self, prompt='> '):
         return self.input_handler(prompt, history=self.history).strip()
 
-    def repl(self, print_all=False, history='.snarf_history'):
-        self.history = FileHistory('.snarf_history') if history else None
+    def repl(self, print_all=False, history='~/.snagit_history'):
+        if history:
+            self.history = FileHistory(utils.absolute_filename(history))
+        else:
+            self.history = None
+
         print('Type "help" for more information. Ctrl+c to exit')
         while True:
             try:

@@ -1,16 +1,16 @@
-.. image:: https://travis-ci.org/dakrauth/snarf.svg?branch=master
-    :target: https://travis-ci.org/dakrauth/snarf
+.. image:: https://travis-ci.org/dakrauth/snagit.svg?branch=master
+    :target: https://travis-ci.org/dakrauth/snagit
 
 
-snarf
-=====
+snagit
+======
 
 Yet another scrapping tool.
 
-``snarf`` allows you to scrape multiple pages or documents by either running
+``snagit`` allows you to scrape multiple pages or documents by either running
 script files, or in the interactive REPL. For instance::
 
-    $ snarf
+    $ snagit
     Type "help" for more information. Ctrl+c to exit
     > load http://httpbin.org/links/3/{} range='0-2'
     > print
@@ -71,10 +71,10 @@ Assumptions: you have ``pip`` and ``virtualenv`` installed.
 
 ::
 
-    $ virtualenv snarf
+    $ virtualenv snagit
     $ source bin/activate
-    $ git clone https://github.com/dakrauth/snarf.git
-    $ cd snarf
+    $ git clone https://github.com/dakrauth/snagit.git
+    $ cd snagit
     $ inv develop
     $ inv test
     $ inv cov

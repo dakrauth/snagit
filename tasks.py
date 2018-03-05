@@ -4,7 +4,7 @@ from invoke import task
 @task
 def clean(ctx):
     '''Remove build artifacts'''
-    ctx.run('rm -rf .cache build snarf.egg-info .coverage htmlcov')
+    ctx.run('rm -rf .cache build snagit.egg-info .coverage htmlcov')
 
 
 @task
@@ -19,7 +19,7 @@ def develop(ctx):
 def test(ctx, filename=''):
     '''Run tests and coverage'''
     ctx.run(
-        "py.test --cov-config .coveragerc --cov-report html --cov-report term --cov=snarf {}".format(filename),
+        "py.test --cov-config .coveragerc --cov-report html --cov-report term --cov=snagit {}".format(filename),
         pty=True
     )
 

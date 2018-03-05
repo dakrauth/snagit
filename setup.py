@@ -2,19 +2,17 @@
 import os, sys
 from setuptools import find_packages, setup
 
-if sys.argv[-1] == 'publish':
-    os.system('python setup.py sdist upload')
-    sys.exit(0)
 
 with open('README.rst', 'r') as f:
     long_description = f.read()
 
-# Dynamically calculate the version based on swingtime.VERSION.
-version=__import__('snarf').get_version()
+# Dynamically calculate the version.
+version=__import__('snagit').get_version()
+
 
 setup(
-    name='snarf',
-    url='https://github.com/dakrauth/snarf',
+    name='snagit',
+    url='https://github.com/dakrauth/snagit',
     author='David A Krauth',
     author_email='dakrauth@gmail.com',
     description='Simple tools for downloading, cleaning, extracting and parsing content',
@@ -33,6 +31,6 @@ setup(
     packages=find_packages(),
     install_requires=['requests', 'beautifulsoup4', 'strutil'],
     entry_points = {
-        'console_scripts': ['snarf = snarf.__main__:main']
+        'console_scripts': ['snagit = snagit.__main__:main']
     }
 )

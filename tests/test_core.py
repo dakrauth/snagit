@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from snarf import utils
-from snarf import repl
+from snagit import utils
+from snagit import repl
 
-from snarf.core import Interpreter, execute_code, execute_script, lexer
+from snagit.core import Interpreter, execute_code, execute_script, lexer
 
 HERE = Path(__file__).parent
 DATA_DIR = HERE / 'data'
@@ -156,10 +156,10 @@ class TestProgram:
         assert len(interp.contents.stack) == 0
 
     def test_run(self):
-        assert "Hello, world" == execute_code('run tests/script.snarf', 'Hello, world#')
+        assert "Hello, world" == execute_code('run tests/script.snagit', 'Hello, world#')
 
     def test_execute_script(self):
-        assert "Hello, world" == execute_script('tests/script.snarf', 'Hello, world#')
+        assert "Hello, world" == execute_script('tests/script.snagit', 'Hello, world#')
 
 
 class TestRepl:
@@ -182,6 +182,6 @@ class TestRepl:
 
 
 def test_version():
-    from snarf import get_version
+    from snagit import get_version
     version = [int(i) for i in get_version().split('.')]
     assert len(version) > 1

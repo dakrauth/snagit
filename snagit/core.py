@@ -21,7 +21,7 @@ from . import core
 from . import exceptions
 
 logger = logging.getLogger(__name__)
-BASE_LIBS = ['snarf.lib.text', 'snarf.lib.lines', 'snarf.lib.soup']
+BASE_LIBS = ['snagit.lib.text', 'snagit.lib.lines', 'snagit.lib.soup']
 ReType = type(re.compile(''))
 
 

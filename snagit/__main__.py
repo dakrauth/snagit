@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args(args=None):
-    parser = argparse.ArgumentParser(prog='snarf', description=__doc__)
+    parser = argparse.ArgumentParser(prog='snagit', description=__doc__)
     parser.add_argument('script', nargs='*')
     parser.add_argument('-s', '--source', help='load source material')
     parser.add_argument(

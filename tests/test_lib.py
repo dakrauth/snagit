@@ -1,7 +1,7 @@
 import re
 import pytest
-from snarf import utils
-from snarf.core import execute_code
+from snagit import utils
+from snagit.core import execute_code
 
 LINES = [
     'foo bar baz',
