@@ -1,3 +1,6 @@
+.. image:: https://badge.fury.io/py/snagit.svg
+    :target: https://badge.fury.io/py/snagit
+
 .. image:: https://travis-ci.org/dakrauth/snagit.svg?branch=master
     :target: https://travis-ci.org/dakrauth/snagit
 
@@ -6,6 +9,9 @@ snagit
 ======
 
 Yet another scrapping tool.
+
+    $ pip install snagit
+
 
 ``snagit`` allows you to scrape multiple pages or documents by either running
 script files, or in the interactive REPL. For instance::
