@@ -1,3 +1,7 @@
+.. image:: https://travis-ci.org/dakrauth/snarf.svg?branch=master
+    :target: https://travis-ci.org/dakrauth/snarf
+
+
 snarf
 =====
 
@@ -48,7 +52,7 @@ Features
 Requirements
 ------------
 
-* Python 3.4+
+* Python 3.5+
 * ``bs4`` (BeautifulSoup 4.x)
 * ``requests``
 * ``strutil``
