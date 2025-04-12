@@ -58,11 +58,9 @@ Features
 Requirements
 ------------
 
-* Python 3.5+
-* ``bs4`` (BeautifulSoup 4.x)
-* ``requests``
-* ``strutil``
-* ``cachely``
+* Python 3.11+
+* ``bs4`` (BeautifulSoup 4.13+)
+* ``cachely`` 0.2+
 
 For testing:
 

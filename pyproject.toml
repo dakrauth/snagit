@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "snagit"
+dynamic = ["version"]
+description = "Simple tools for downloading, cleaning, extracting and parsing content"
+license = { file = "LICENSE" }
+keywords = ["django", "calendar", "events"]
+readme = { file = "README.rst", content-type = "text/x-rst" }
+authors = [
+    { name = "David A Krauth", email = "dakrauth@gmail.com" },
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "beautifulsoup4>=4.13",
+    "prompt-toolkit>=3.0",
+    "cachely>=0.2",
+]
+
+# html5lib<1.1
+
+[project.urls]
+Homepage = "https://github.com/dakrauth/snagit"
+
+[project.optional-dependencies]
+dev = [
+    "tox",
+    "coverage",
+    "pytest",
+    "pytest-cov",
+    "responses",
+    "flake8",
+    "ruff",
+    "build",
+    "twine",
+    "ipdb",
+]
+
+[project.scripts]
+snagit = "snagit.__main__:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "snagit.__version__"}
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["snagit", "snagit.lib"]
+
+[tool.ruff]
+cache-dir = "temp/ruff"
+line-length = 100
+indent-width = 4
+
+[tool.pytest.ini_options]
+pythonpath = "."
+minversion = "6.0"
+testpaths = [ ".", ]
+filterwarnings = [
+    # "ignore::PendingDeprecationWarning",
+    "error",
+]
+    
+addopts = "-rf"
+
+[tool.coverage.run]
+branch = true
+source = [ "src/snagit" ]
+omit = [ "**/migrations/**" ]
+
+[tool.coverage.html]
+directory = "build/coverage"
+title = "Snagit Coverage report"
+
+[tool.coverage.report]
+ignore_errors = true
+
+# Regexes for lines to exclude from consideration
+exclude_lines = [
+    # Have to re-enable the standard pragma
+    "pragma: no cover",
+
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if __name__ == .__main__.:"
+]

@@ -57,3 +57,6 @@ target/
 scripts/
 .snagit_history
 .pytest_cache
+
+/go.py
+/temp

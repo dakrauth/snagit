@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o pipefail
+TIMEFORMAT="Task completed in %3lR"
+
+function init {
+    python -m venv --prompt snagit .venv
+    .venv/bin/pip install -e ".[dev]"
+}
+
+function clean {
+    rm -rf .pytest_cache build src/snagit.egg-info .coverage build
+}
+
+function lint {
+    .venv/bin/ruff "$@" check src/snagit tests
+}
+
+function check {
+    .venv/bin/ruff format --diff --check "$@" src/snagit tests
+}
+
+function format {
+    .venv/bin/ruff format "$@" src/snagit tests
+}
+
+function test {
+    .venv/bin/pytest --cov-report html --cov-report term --cov=snagit "$@" tests
+    echo Open or ⌘+click "./build/coverage/index.html" for coverage info
+}
+
+function help {
+    echo "Options:"
+    echo "    lint:   Linter"
+    echo "    check:  Formatting checks"
+    echo "    format: Run formatter"
+    echo "    test:   Execute tests"
+    echo "    clean:  Clean all build and test artifacts"
+}
+
+if [ -z "$1" ]; then
+    help
+else
+    what=$1
+    shift
+    time ${what:-help} "$@"
+fi 
