@@ -5,7 +5,8 @@ from ..exceptions import SnagitQuit
 class Library(BaseLibrary):
     name = "repl"
 
-    def repl_list(self, data, args, kwargs):
+    @BaseLibrary.alias("l")
+    def repl_list(self, args, kwargs):
         """
         List all lines of source code if not empty.
         """
@@ -17,7 +18,16 @@ class Library(BaseLibrary):
             )
         )
 
-    def repl_quit(self, data, args, kwargs):
+    @BaseLibrary.alias("e")
+    def repl_echo(self, args, kwargs):
+        """
+        Toggle the instruction echo feature.
+        """
+        self.interpreter.do_echo = not self.interpreter.do_echo
+        print(f"Echo is now {'on' if self.interpreter.do_echo else 'off'}")
+
+    @BaseLibrary.alias("q")
+    def repl_quit(self, args, kwargs):
         """
         Exit the program
         """

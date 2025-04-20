@@ -1,6 +1,7 @@
 import re
 import sys
 import json
+import shlex
 import logging
 import inspect
 import importlib
@@ -20,7 +21,23 @@ InstructionHandler = namedtuple(
 )
 
 
-class Instruction(namedtuple("Instruction", "cmd args kws line lineno")):
+LineInfo = namedtuple("LineInfo", "lineno line tokens")
+
+def repr_ex(w):
+    if utils.is_regex(w):
+        return '/"{}"/'.format(str(w.pattern))
+
+    return repr(w)
+
+
+def str_ex(w):
+    if utils.is_regex(w):
+        return '/"{}"/'.format(str(w.pattern))
+
+    return str(w)
+
+
+class Instruction(namedtuple("Instruction", "cmd args kwargs linfo")):
     """
     ``Instruction``'s take the form::
 
@@ -30,98 +47,88 @@ class Instruction(namedtuple("Instruction", "cmd args kws line lineno")):
     digit, True, False, None, or a simple, unquoted string.
     """
 
-    values_pat = r"""
-        [rj]?'(?:(\'|[^'])*?)' |
-        [r]?"(?:(\"|[^"])*?)"  |
-        (\d+)                  |
-        (True|False|None)      |
-        ([^\s,]+)
-    """
-
-    args_re = re.compile(
-        r"""^(
-            (?P<kwd>\w[\w\d-]*)=(?P<val>{0}) |
-            (?P<arg>{0}|([\s,]+))
-        )\s*""".format(values_pat),
-        re.VERBOSE,
-    )
-
-    value_dict = {str(val): val for val in [True, False, None]}
+    def __repr__(self):
+        args = " ".join([repr_ex(c) for c in self.args]) or None
+        kwargs = " ".join(f"{k}={repr_ex(v)}" for k, v in self.kwargs.items()) or None
+        return f"<cmd: {self.cmd.lower()}, args={args}, kwargs={kwargs}, linfo={self.linfo}"
 
     def __str__(self):
-        def _repr(w):
-            if utils.is_regex(w):
-                return 'r"{}"'.format(str(w.pattern))
+        bits = [
+            self.cmd.lower(),
+            " ".join([str_ex(c) for c in self.args]) or "",
+            " ".join(f"{k}={str_ex(v)}" for k, v in self.kwargs.items()) or ""
+        ]
+        return " ".join(bit for bit in bits if bit)
 
-            return repr(w)
+    @property
+    def lineno(self):
+        return self.linfo.lineno
 
-        return "{}{}{}".format(
-            self.cmd.upper(),
-            " {}".format(" ".join([_repr(c) for c in self.args]) if self.args else ""),
-            " {}".format(
-                " ".join("{}={}".format(k, _repr(v)) for k, v in self.kws.items())
-                if self.kws
-                else ""
-            ),
-        )
+    @property
+    def line(self):
+        return self.linfo.line
 
-    @classmethod
-    def get_value(cls, s):
-        if s.isdigit():
-            return int(s)
-        elif s in cls.value_dict:
-            return cls.value_dict[s]
-        elif s.startswith(('r"', "r'")):
-            return re.compile(utils.escaped(s[2:-1]))
-        elif s.startswith("j'"):
-            return json.loads(utils.escaped(s[2:-1]))
-        elif s.startswith(('"', "'")):
-            return utils.escaped(s[1:-1])
-        else:
-            return s.strip()
 
-    @classmethod
-    def parse(cls, line, lineno):
+class Parser:
+    kwarg_re = re.compile(r"(\w+)=(.+)")
+    const_dict = {str(val): val for val in [True, False, None]}
+
+    def get_value(self, text):
+        if text.isdigit():
+            return int(text)
+
+        if text in self.const_dict:
+            return self.const_dict[text]
+
+        if len(text) > 1:
+            end = text[-1]
+            if text.startswith(end) and end == "/":
+                return re.compile(utils.escaped(text[1:-1]))
+
+            if end in "'\"":
+                if text.startswith(end):
+                    return utils.escaped(text[1:-1])
+
+                if text.startswith(f"r{end}"):
+                    return re.compile(utils.escaped(text[2:-1]))
+
+        return text
+
+    def lexer(self, line):
+        self.lineno += 1
+        line = line.strip()
+        if line:
+            # import pdb; pdb.set_trace()
+            tokens = shlex.split(line, comments=True)
+            if tokens:
+                logger.debug(f"Lexed {len(tokens)} token(s) line {self.lineno}: {tokens}")
+                yield LineInfo(self.lineno, line, tokens)
+
+    def parse(self, linfo):
+        lineno, line, tokens = linfo
+        cmd, *tokens = tokens
         args = []
-        kws = {}
-        cmd, text = utils.splitter(line, expected=2, strip=True)
-        cmd = cmd.lower()
+        kwargs = {}
 
-        while text:
-            m = cls.args_re.search(text)
-            if not m:
-                break
-
-            gdict = m.groupdict()
-            kwd = gdict.get("kwd")
-            if kwd:
-                kws[kwd] = cls.get_value(gdict.get("val", ""))
-            else:
-                arg = gdict.get("arg", "").strip()
-                if arg != ",":
-                    args.append(cls.get_value(arg))
-
-            text = text[len(m.group()) :]
-
-        if text:
-            raise SyntaxError('Syntax error: "{}" (line {})'.format(text, lineno))
-
-        return cls(cmd, args, kws, line, lineno)
-
-    @classmethod
-    def lexer(cls, code, lineno=0):
-        """
-        Takes the script source code, scans it, and lexes it into
-        ``Instructions``
-        """
-        for chars in code.splitlines():
-            lineno += 1
-            line = chars.rstrip()
-            if not line or line.lstrip().startswith("#"):
+        for token in tokens:
+            m = self.kwarg_re.match(token)
+            if m:
+                k, v = m.groups()
+                kwargs[k] = self.get_value(v)
                 continue
 
-            logger.debug("Lexed {} byte(s) line {}".format(len(line), chars))
-            yield cls.parse(line, lineno)
+            args.append(self.get_value(token))
+
+        return Instruction(cmd.lower(), args, kwargs, linfo)
+
+    def process(self, code, lineno=0):
+        """
+        Takes the script source code, lexs each line and parses out individial ``Instruction``s
+        """
+        self.lineno = lineno
+        for line in code.splitlines():
+            for linfo in self.lexer(line):
+                yield self.parse(linfo)
 
 
 def annotate_function_description(func, kind, short_name, long_name):
@@ -141,6 +148,13 @@ class BaseLibrary:
 
     def __init__(self, interprepter):
         self.interpreter = interprepter
+
+    @staticmethod
+    def alias(a):
+        def wrapper(func):
+            func.snagit_alias = a
+            return func
+        return wrapper
 
 
 class Contents:
@@ -164,14 +178,6 @@ class Contents:
         if self.stack:
             self.contents = self.stack.pop()
 
-    # def __call__(self, func, args, kws):
-    #     contents = []
-    #     for data in self:
-    #         result = func(data, args, kws)
-    #         if result is not None:
-    #             contents.append(result)
-    #     self.update(contents)
-
     def merge(self):
         if self.contents:
             first = self.contents[0]
@@ -188,6 +194,9 @@ class Contents:
             self.update(f"{data}\n")
 
     def update(self, contents):
+        if not contents:
+            return
+
         if self.contents:
             self.stack.append(self.contents)
 
@@ -207,13 +216,18 @@ class Contents:
             self.contents.append(ct)
 
 
+def arg_count(func):
+    return func.__func__.__code__.co_argcount
+
+
 class Interpreter:
-    instruction_class = Instruction
+    parser_class = Parser
     contents_class = Contents
     loader_class = utils.Loader
 
     def __init__(self, contents=None, use_cache=False, extensions=None, **kwargs):
-        self.instruction_class = kwargs.pop("instruction_class", self.instruction_class)
+        parser_class = kwargs.pop("parser_class", self.parser_class)
+        self.parser = parser_class()
         self.contents_class = kwargs.pop("contents_class", self.contents_class)
         self.loader_class = kwargs.pop("loader_class", self.loader_class)
 
@@ -247,11 +261,14 @@ class Interpreter:
             return inspect.isfunction(fn) and fn.__name__.startswith(prefix)
 
         for method_name, method in inspect.getmembers(Library, is_instruction):
-            short_name = method_name.replace(prefix, "", count=1)
+            short_name = method_name.replace(prefix, "", 1)
             long_name = f"{lib_name}:{short_name}"
 
             annotate_function_description(method, lib_name, short_name, long_name)
-            self.registry[short_name] = self.registry[long_name] = getattr(instance, method_name)
+            instance_function = getattr(instance, method_name)
+            self.registry[short_name] = self.registry[long_name] = instance_function
+            if hasattr(method, "snagit_alias"):
+                self.registry[method.snagit_alias] = instance_function
 
     def load_source(self, source, use_cache=None):
         ct = self.loader.load_source(source, use_cache=use_cache)
@@ -266,19 +283,19 @@ class Interpreter:
             for instr in self.instructions
         ]
 
-    def lex(self, code):
-        lineno = self.instructions[-1].lineno if self.instructions else 0
-        instructions = list(self.instruction_class.lexer(code, lineno))
+    def parse(self, code):
+        lineno = self.instructions[-1].linfo.lineno if self.instructions else 0
+        instructions = list(self.parser.process(code, lineno))
         self.instructions.extend(instructions)
         return instructions
 
     def execute(self, code):
-        instrs = self.lex(code)
+        instrs = self.parse(code)
         for instr in instrs:
             if self.do_echo:
                 print(
                     f"Executing line {instr.lineno}: "
-                    f"{instr.cmd} args={instr.args}, kwargs={instr.kws}"
+                    f"{instr.cmd} args={instr.args}, kwargs={instr.kwargs}"
                 )
             self._execute_instruction(instr)
 
@@ -305,13 +322,16 @@ class Interpreter:
         if do_debug:
             utils.set_trace()
 
-        contents = list(self.contents)
-        contents = contents or [""]
+        if arg_count(handler) == 3:  # self, args, kwargs
+            results = handler(instr.args, instr.kwargs)
+            self.contents.update(results)
+            return
+
         results = []
-        # import pdb; pdb.set_trace()
+        contents = list(self.contents) or [""]
         for data in contents:
             try:
-                result = handler(data, instr.args, instr.kws)
+                result = handler(data, instr.args, instr.kwargs)
             except exceptions.SnagitStopInteration:
                 break
             except Exception:
@@ -326,8 +346,7 @@ class Interpreter:
             if result is not None:
                 results.append(result)
 
-        if results:
-            self.contents.update(results)
+        self.contents.update(results)
 
 
 def execute_code(code, contents="", exec_class=Interpreter):

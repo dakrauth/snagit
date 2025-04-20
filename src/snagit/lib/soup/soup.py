@@ -69,8 +69,8 @@ class SoupProxy(DataProxy):
         if not isinstance(contents, list):
             raise ValueError(f"Cannot create soup from type {type(contents)}")  # noqa
 
-        soup = bs.BeautifulSoup("", utils.config.parser)
-        soup.contents = contents
+        soup = bs.BeautifulSoup("", utils.config.parser, parse_only=strainer)
+        soup.extend(contents)
         return soup
 
 
@@ -93,41 +93,36 @@ class Library(BaseLibrary):
 
         return soup
 
+    def _unwrap(self, soup, selector, attr=None):
+        if attr:
+            for el in soup.select(selector):
+                attrs = getattr(el, "attrs", {})
+                what = attrs.get(attr, "")
+                if isinstance(what, list):
+                    what = " ".join(what)
+
+                el.replace_with(what)
+            return soup
+
+        for el in soup.select(selector):
+            el.unwrap()
+
+        return soup
+
     def soup_unwrap(self, data, args, kws):
         """
         Replace an element with its child contents.
         """
-        # import ipdb; ipdb.set_trace()
-        soup = SoupProxy(data)
-        args = ",".join(args)
-        for el in soup.select(args):
-            el.unwrap()
-        return soup
-
-    def soup_unwrap_attr(self, data, args, kws):
-        """
-        Replace an element with the content for a specified attribute.
-        """
-        soup = SoupProxy(data)
-        for el in soup.select(args[0]):
-            attrs = getattr(el, "attrs", {})
-            what = attrs.get(args[1], "")
-            if isinstance(what, (list, tuple)):
-                what = " ".join(what)
-
-            el.replace_with(what)
-
-        return soup
+        return self._unwrap(SoupProxy(data), ",".join(args), kws.get("attr"))
 
     def soup_smooth(self, data, args, kws):
         """
         Combine consecutive navigable strings, compressing whitespace.
         """
         soup = SoupProxy(data)
-        args = args or ["*"]
-        for arg in args:
-            for tag in soup.select(arg):
-                tag.smooth()
+        args = ",".join(args) if args else "*"
+        for tag in soup.select(args):
+            tag.smooth()
 
         return soup
 
@@ -139,6 +134,7 @@ class Library(BaseLibrary):
         args = ",".join(args)
         for el in soup.select(args):
             el.extract()
+
         return soup
 
     def soup_replace_content(self, data, args, kws):
@@ -170,7 +166,7 @@ class Library(BaseLibrary):
         """
         soup = SoupProxy(data)
         results = soup.find_all(*args, **kws)
-        return results
+        return SoupProxy(results)
 
     def soup_select(self, data, args, kws):
         """
@@ -179,7 +175,8 @@ class Library(BaseLibrary):
         soup = SoupProxy(data)
         args = args[0] if args else "*"
         results = soup.select(args, limit=kws.get("limit"))
-        return results
+        # import pdb; pdb.set_trace()
+        return SoupProxy(results)
 
     def soup_rmempty(self, data, args, kws):
         """
@@ -199,8 +196,7 @@ class Library(BaseLibrary):
 
             contents.append(node)
 
-        soup.contents = contents
-        return soup
+        return SoupProxy(contents)
 
     def soup_rmattrs(self, data, args, kws):
         """

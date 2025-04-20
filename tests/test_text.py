@@ -45,7 +45,7 @@ class TestLines:
 
     def test_matches(self, lines):
         data = join_lines()
-        res = execute_code('matches r"(x|z)+"', data)
+        res = execute_code('matches /(x|z)+/', data)
         assert res == "xxxxxxxx\nzzzz"
 
     def test_merge(self):

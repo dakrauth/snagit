@@ -19,6 +19,10 @@ def compress(text):
     return "".join(re.findall(r"([\S]+)", text))
 
 
+def almost(text):
+    return text.replace("\n", "")
+
+
 def assert_html_equal(expect, actual):
     expect = compress(expect)
     actual = compress(actual)
@@ -52,7 +56,7 @@ def test_unwrap():
 
 
 def test_unwrap_attr():
-    text = execute_code("strain p\nunwrap_attr b class", HTML)
+    text = execute_code("strain p\nunwrap b attr=class", HTML)
     assert_html_equal("<p>Hello, foo</p>", text)
 
 
@@ -69,13 +73,15 @@ def test_rmattrs():
 
 
 def test_select():
-    h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i></span>'
+    h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i><b>x</b></span>'
     result = execute_code("select [data-foo-bar]", h)
-    assert '[<i class="i" data-foo-bar="#"></i>]' == result
+    assert '<i class="i" data-foo-bar="#"></i>' == almost(result)
 
+    result = execute_code("select b", h)
+    assert '<b class="b"></b><b>x</b>' == almost(result)
 
 def test_replace_content():
-    text = execute_code('strain p\nreplace_content .foo r"[ld]+" k', HTML)
+    text = execute_code('strain p\nreplace_content .foo /[ld]+/ k', HTML)
     assert_html_equal('<p>Hello, <b class="foo">work</b></p>', text)
 
 
@@ -107,9 +113,14 @@ def test_rmempty():
 
 
 def test_find_all():
-    h = '<span foo="bar"><b class="b"></b><i class="i" data-foo-bar="#"></i></span>'
+    b = '<b class="b"></b>'
+    h = f'<span foo="bar">{b}<i class="i" data-foo-bar="#"></i></span>'
     text = execute_code("find_all b", h)
-    assert '[<b class="b"></b>]' == text
+    assert f"{b}" == text
+
+    h = f'{h}{b}'
+    text = execute_code("find_all b", h)
+    assert f"{b}{b}" == almost(text)
 
 
 def test_bs(BS):

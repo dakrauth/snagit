@@ -3,7 +3,7 @@ from prompt_toolkit.shortcuts import prompt
 from prompt_toolkit.history import FileHistory
 
 from .core import Interpreter
-from .exceptions import SnagitQuit
+from .exceptions import SnagitQuit, ProgramWarning
 
 
 class Repl(Interpreter):
@@ -40,6 +40,8 @@ class Repl(Interpreter):
                 self.execute(line)
             except SnagitQuit:
                 break
+            except ProgramWarning as exc:
+                print(exc)
             finally:
                 if print_all:
                     print(str(self.contents))

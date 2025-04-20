@@ -9,20 +9,19 @@ from ..exceptions import SnagitStopInteration
 class Library(BaseLibrary):
     name = "prog"
 
-    def prog_parser(self, data, args, kwargs):
+    def prog_parser(self, args, kwargs):
         """
         Speicify the BeautifulSoup parser to use.
         """
         utils.config.parser = args[0]
 
-    def prog_merge(self, data, args, kwargs):
+    def prog_merge(self, args, kwargs):
         """
         Combine all contents into a single content.
         """
         self.interpreter.contents.merge()
-        raise SnagitStopInteration("merged")
 
-    def prog_cache(self, data, args, kwargs):
+    def prog_cache(self, args, kwargs):
         """
         Control caching.
 
@@ -44,15 +43,13 @@ class Library(BaseLibrary):
 
         return results
 
-    def prog_load(self, data, args, kwargs):
+    def prog_load(self, args, kwargs):
         """
         Load new resource(s).
         """
-        results = self._load(args, kwargs)
-        self.interpreter.contents.update(results)
-        raise SnagitStopInteration("load complete")
+        return self._load(args, kwargs)
 
-    def prog_load_all(self, data, args, kwargs):
+    def prog_load_all(self, args, kwargs):
         """
         Load new resource(s) from current content contents array.
         """
@@ -60,27 +57,26 @@ class Library(BaseLibrary):
         for content in self.interpreter.contents:
             results.extend(self._load([str(content)], {}))
 
-        self.interpreter.contents.update(results)
-        raise SnagitStopInteration("load all complete")
+        return results
 
-    def prog_debug(self, data, args, kwargs):
+    def prog_debug(self, args, kwargs):
         """
         Enable a debugging breakpoint.
         """
         self.interpreter.do_debug = True
 
-    def prog_run(self, data, args, kwargs):
+    def prog_run(self, args, kwargs):
         for arg in args:
             code = Path(arg).read_text()
             self.interpreter.execute(code)
 
-    def prog_write(self, data, args, kwargs):
+    def prog_write(self, args, kwargs):
         """
         Dumps the text representation of all content to the specified file.
         """
         Path(args[0]).write_text(str(self.interpreter.contents))
 
-    def prog_print(self, data, args, kwargs):
+    def prog_print(self, args, kwargs):
         """
         Print out the text representation of the content.
         """
@@ -88,15 +84,15 @@ class Library(BaseLibrary):
             print(" ".join(str(s) for s in args))
         print(str(self.interpreter.contents))
 
-    def prog_end(self, data, args, kwargs):
+    def prog_end(self, args, kwargs):
         self.interpreter.contents.pop()
 
-    def prog_struct(self, data, args, kwargs):
+    def prog_struct(self, args, kwargs):
         self.interpreter.contents.struct(
             args, strip=kwargs.get("strip", False), name=kwargs.get("name")
         )
 
-    def prog_help(self, data, args, kwargs):
+    def prog_help(self, args, kwargs):
         """
         Display help on available commands.
         """

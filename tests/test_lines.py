@@ -49,7 +49,7 @@ def test_format(lines):
 
 def test_matches(lines):
     data = join_lines()
-    res = execute_code('matches r"(x|z)+"', data)
+    res = execute_code('matches /(x|z)+/', data)
     assert res == "xxxxxxxx\nzzzz"
 
 
