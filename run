@@ -6,7 +6,7 @@ TIMEFORMAT="Task completed in %3lR"
 
 function init {
     python -m venv --prompt snagit .venv
-    .venv/bin/pip install -e ".[dev]"
+    .venv/bin/pip install -e ".[dev,lxml]"
 }
 
 function clean {
@@ -30,13 +30,19 @@ function test {
     echo Open or ⌘+click "./build/coverage/index.html" for coverage info
 }
 
+function snagit {
+    .venv/bin/snagit "$@"
+}
+
 function help {
     echo "Options:"
-    echo "    lint:   Linter"
-    echo "    check:  Formatting checks"
-    echo "    format: Run formatter"
-    echo "    test:   Execute tests"
-    echo "    clean:  Clean all build and test artifacts"
+    echo "    init:    Initialize virtual env and install dependencies"
+    echo "    snagit:  Execute the install REPL"
+    echo "    lint:    Linter"
+    echo "    check:   Formatting checks"
+    echo "    format:  Run formatter"
+    echo "    test:    Execute tests"
+    echo "    clean:   Clean all build and test artifacts"
 }
 
 if [ -z "$1" ]; then

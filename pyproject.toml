@@ -47,6 +47,7 @@ dev = [
     "twine",
     "ipdb",
 ]
+lxml = ["lxml"]
 
 [project.scripts]
 snagit = "snagit.__main__:main"
@@ -56,7 +57,7 @@ version = { attr = "snagit.__version__"}
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["snagit", "snagit.lib"]
+packages = ["snagit", "snagit.lib", "snagit.lib.soup"]
 
 [tool.ruff]
 cache-dir = "temp/ruff"
